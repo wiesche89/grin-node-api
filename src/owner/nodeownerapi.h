@@ -22,7 +22,7 @@ class NodeOwnerApi : public QObject
 public:
     explicit NodeOwnerApi(const QString &apiUrl, const QString &apiKey, QObject *parent = nullptr);
 
-    // Async-Aufrufe
+    // --- Async-Aufrufe (bereits QML-fähig) ---
     Q_INVOKABLE void banPeerAsync(const QString &peerAddr);
     Q_INVOKABLE void compactChainAsync();
     Q_INVOKABLE void getConnectedPeersAsync();
@@ -31,15 +31,17 @@ public:
     Q_INVOKABLE void unbanPeerAsync(const QString &peerAddr);
     Q_INVOKABLE void validateChainAsync(bool assumeValidRangeproofsKernels);
 
-    // Polling
-    void startStatusPolling(int intervalMs);
-    void startConnectedPeersPolling(int intervalMs);
+    // --- Polling: jetzt QML-invokable + Stop-Methoden ---
+    Q_INVOKABLE void startStatusPolling(int intervalMs);
+    Q_INVOKABLE void stopStatusPolling();
+    Q_INVOKABLE void startConnectedPeersPolling(int intervalMs);
+    Q_INVOKABLE void stopConnectedPeersPolling();
 
 signals:
     void banPeerFinished(Result<bool> result);
     void compactChainFinished(Result<bool> result);
-    void getConnectedPeersFinished(Result<QList<PeerInfoDisplay>> result);
-    void getPeersFinished(Result<QList<PeerData>> result);
+    void getConnectedPeersFinished(Result<QList<PeerInfoDisplay> > result);
+    void getPeersFinished(Result<QList<PeerData> > result);
     void getStatusFinished(Result<Status> result);
     void unbanPeerFinished(Result<bool> result);
     void validateChainFinished(Result<bool> result);
@@ -47,14 +49,20 @@ signals:
     void statusUpdated(const Status &status);
     void connectedPeersUpdated(const QList<PeerInfoDisplay> &peers);
 
+private slots:
+    void handleStatusResult(const Result<Status> &r);
+    void handleConnectedPeersResult(const Result<QList<PeerInfoDisplay> > &r);
+
 private:
-    void postAsync(const QString &method,
-                   const QJsonArray &params,
-                   std::function<void(const QJsonObject&, const QString&)> handler);
+    void postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &, const QString &)> handler);
 
     QString m_apiUrl;
     QString m_apiKey;
-    QNetworkAccessManager *m_networkManager;
+    QNetworkAccessManager *m_networkManager{nullptr};
+
+    // --- Polling-Timer ---
+    QTimer *m_statusPollTimer{nullptr};
+    QTimer *m_peersPollTimer{nullptr};
 };
 
 #endif // NODEOWNERAPI_H

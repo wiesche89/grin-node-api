@@ -1,16 +1,15 @@
 #include "nodeownerapi.h"
 
-NodeOwnerApi::NodeOwnerApi(const QString &apiUrl, const QString &apiKey, QObject *parent)
-    : QObject(parent),
+NodeOwnerApi::NodeOwnerApi(const QString &apiUrl, const QString &apiKey, QObject *parent) :
+    QObject(parent),
     m_apiUrl(apiUrl),
     m_apiKey(apiKey),
     m_networkManager(new QNetworkAccessManager(this))
 {
 }
 
-void NodeOwnerApi::postAsync(const QString &method,
-                             const QJsonArray &params,
-                             std::function<void(const QJsonObject&, const QString&)> handler)
+void NodeOwnerApi::postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &,
+                                                                                                 const QString &)> handler)
 {
     QNetworkRequest req(m_apiUrl);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -48,8 +47,9 @@ void NodeOwnerApi::postAsync(const QString &method,
 
 void NodeOwnerApi::banPeerAsync(const QString &peerAddr)
 {
-    QJsonArray params; params.append(peerAddr);
-    postAsync("ban_peer", params, [this](const QJsonObject &o, const QString &err){
+    QJsonArray params;
+    params.append(peerAddr);
+    postAsync("ban_peer", params, [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
             emit banPeerFinished(Result<bool>(Error(ErrorType::ApiOther, err)));
             return;
@@ -66,7 +66,7 @@ void NodeOwnerApi::banPeerAsync(const QString &peerAddr)
 
 void NodeOwnerApi::compactChainAsync()
 {
-    postAsync("compact_chain", QJsonArray(), [this](const QJsonObject &o, const QString &err){
+    postAsync("compact_chain", QJsonArray(), [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
             emit compactChainFinished(Result<bool>(Error(ErrorType::ApiOther, err)));
             return;
@@ -83,51 +83,59 @@ void NodeOwnerApi::compactChainAsync()
 
 void NodeOwnerApi::getConnectedPeersAsync()
 {
-    postAsync("get_connected_peers", QJsonArray(), [this](const QJsonObject &o, const QString &err){
+    postAsync("get_connected_peers", QJsonArray(), [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
-            emit getConnectedPeersFinished(Result<QList<PeerInfoDisplay>>(Error(ErrorType::ApiOther, err)));
+            emit getConnectedPeersFinished(Result<QList<PeerInfoDisplay> >(Error(ErrorType::ApiOther, err)));
             return;
         }
         auto res = JsonUtil::extractOkValue(o);
         QJsonValue ok;
         if (!res.unwrapOrLog(ok)) {
-            emit getConnectedPeersFinished(Result<QList<PeerInfoDisplay>>(Error(ErrorType::ApiOther, res.errorMessage())));
+            emit getConnectedPeersFinished(Result<QList<PeerInfoDisplay> >(Error(ErrorType::ApiOther, res.errorMessage())));
             return;
         }
         QList<PeerInfoDisplay> peers;
         for (auto v : ok.toArray()) {
-            if (v.isObject()) peers.append(PeerInfoDisplay::fromJson(v.toObject()));
+            if (v.isObject()) {
+                peers.append(PeerInfoDisplay::fromJson(v.toObject()));
+            }
         }
-        emit getConnectedPeersFinished(Result<QList<PeerInfoDisplay>>(peers));
+        emit getConnectedPeersFinished(Result<QList<PeerInfoDisplay> >(peers));
     });
 }
 
 void NodeOwnerApi::getPeersAsync(const QString &peerAddr)
 {
     QJsonArray params;
-    if (!peerAddr.isEmpty()) params.append(peerAddr); else params.append(QJsonValue::Null);
-    postAsync("get_peers", params, [this](const QJsonObject &o, const QString &err){
+    if (!peerAddr.isEmpty()) {
+        params.append(peerAddr);
+    } else {
+        params.append(QJsonValue::Null);
+    }
+    postAsync("get_peers", params, [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
-            emit getPeersFinished(Result<QList<PeerData>>(Error(ErrorType::ApiOther, err)));
+            emit getPeersFinished(Result<QList<PeerData> >(Error(ErrorType::ApiOther, err)));
             return;
         }
         auto res = JsonUtil::extractOkValue(o);
         QJsonValue ok;
         if (!res.unwrapOrLog(ok)) {
-            emit getPeersFinished(Result<QList<PeerData>>(Error(ErrorType::ApiOther, res.errorMessage())));
+            emit getPeersFinished(Result<QList<PeerData> >(Error(ErrorType::ApiOther, res.errorMessage())));
             return;
         }
         QList<PeerData> peers;
         for (auto v : ok.toArray()) {
-            if (v.isObject()) peers.append(PeerData::fromJson(v.toObject()));
+            if (v.isObject()) {
+                peers.append(PeerData::fromJson(v.toObject()));
+            }
         }
-        emit getPeersFinished(Result<QList<PeerData>>(peers));
+        emit getPeersFinished(Result<QList<PeerData> >(peers));
     });
 }
 
 void NodeOwnerApi::getStatusAsync()
 {
-    postAsync("get_status", QJsonArray(), [this](const QJsonObject &o, const QString &err){
+    postAsync("get_status", QJsonArray(), [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
             emit getStatusFinished(Result<Status>(Error(ErrorType::ApiOther, err)));
             return;
@@ -144,8 +152,9 @@ void NodeOwnerApi::getStatusAsync()
 
 void NodeOwnerApi::unbanPeerAsync(const QString &peerAddr)
 {
-    QJsonArray params; params.append(peerAddr);
-    postAsync("unban_peer", params, [this](const QJsonObject &o, const QString &err){
+    QJsonArray params;
+    params.append(peerAddr);
+    postAsync("unban_peer", params, [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
             emit unbanPeerFinished(Result<bool>(Error(ErrorType::ApiOther, err)));
             return;
@@ -162,8 +171,9 @@ void NodeOwnerApi::unbanPeerAsync(const QString &peerAddr)
 
 void NodeOwnerApi::validateChainAsync(bool assumeValidRangeproofsKernels)
 {
-    QJsonArray params; params.append(assumeValidRangeproofsKernels);
-    postAsync("validate_chain", params, [this](const QJsonObject &o, const QString &err){
+    QJsonArray params;
+    params.append(assumeValidRangeproofsKernels);
+    postAsync("validate_chain", params, [this](const QJsonObject &o, const QString &err) {
         if (!err.isEmpty()) {
             emit validateChainFinished(Result<bool>(Error(ErrorType::ApiOther, err)));
             return;
@@ -180,26 +190,82 @@ void NodeOwnerApi::validateChainAsync(bool assumeValidRangeproofsKernels)
 
 void NodeOwnerApi::startStatusPolling(int intervalMs)
 {
-    connect(this, &NodeOwnerApi::getStatusFinished, this, [this](const Result<Status> &r){
-        Status s;
-        if (r.unwrapOrLog(s)) emit statusUpdated(s);
-        else qWarning() << "[Status Polling]" << r.errorMessage();
-    });
-    auto t = new QTimer(this);
-    connect(t, &QTimer::timeout, this, [this]{ getStatusAsync(); });
-    t->start(intervalMs);
-    getStatusAsync();
+    stopStatusPolling(); // bestehende Verbindungen/Timer säubern
+
+    // Verbindung mit Member-Slot + UniqueConnection
+    connect(this, &NodeOwnerApi::getStatusFinished,
+            this, &NodeOwnerApi::handleStatusResult,
+            Qt::UniqueConnection);
+
+    m_statusPollTimer = new QTimer(this);
+    m_statusPollTimer->setInterval(qMax(500, intervalMs));
+    connect(m_statusPollTimer, &QTimer::timeout, this, &NodeOwnerApi::getStatusAsync);
+    m_statusPollTimer->start();
+
+    getStatusAsync(); // initial
+    qInfo() << "[NodeOwnerApi] Status polling started with interval" << intervalMs << "ms";
+}
+
+void NodeOwnerApi::stopStatusPolling()
+{
+    if (m_statusPollTimer) {
+        m_statusPollTimer->stop();
+        m_statusPollTimer->deleteLater();
+        m_statusPollTimer = nullptr;
+        qInfo() << "[NodeOwnerApi] Status polling stopped";
+    }
+    // gezielt trennen
+    disconnect(this, &NodeOwnerApi::getStatusFinished,
+               this, &NodeOwnerApi::handleStatusResult);
 }
 
 void NodeOwnerApi::startConnectedPeersPolling(int intervalMs)
 {
-    connect(this, &NodeOwnerApi::getConnectedPeersFinished, this, [this](const Result<QList<PeerInfoDisplay>> &r){
-        QList<PeerInfoDisplay> peers;
-        if (r.unwrapOrLog(peers)) emit connectedPeersUpdated(peers);
-        else qWarning() << "[Peers Polling]" << r.errorMessage();
-    });
-    auto t = new QTimer(this);
-    connect(t, &QTimer::timeout, this, [this]{ getConnectedPeersAsync(); });
-    t->start(intervalMs);
-    getConnectedPeersAsync();
+    stopConnectedPeersPolling();
+
+    connect(this, &NodeOwnerApi::getConnectedPeersFinished,
+            this, &NodeOwnerApi::handleConnectedPeersResult,
+            Qt::UniqueConnection);
+
+    m_peersPollTimer = new QTimer(this);
+    m_peersPollTimer->setInterval(qMax(500, intervalMs));
+    connect(m_peersPollTimer, &QTimer::timeout, this, &NodeOwnerApi::getConnectedPeersAsync);
+    m_peersPollTimer->start();
+
+    getConnectedPeersAsync(); // initial
+    qInfo() << "[NodeOwnerApi] Connected-peers polling started with interval" << intervalMs << "ms";
+}
+
+void NodeOwnerApi::stopConnectedPeersPolling()
+{
+    if (m_peersPollTimer) {
+        m_peersPollTimer->stop();
+        m_peersPollTimer->deleteLater();
+        m_peersPollTimer = nullptr;
+        qInfo() << "[NodeOwnerApi] Connected-peers polling stopped";
+    }
+    disconnect(this, &NodeOwnerApi::getConnectedPeersFinished,
+               this, &NodeOwnerApi::handleConnectedPeersResult);
+}
+
+// ----- Slots-Implementierungen -----
+void NodeOwnerApi::handleStatusResult(const Result<Status> &r)
+{
+    Status s;
+    if (r.unwrapOrLog(s)) {
+        qDebug() << "emit: statusUpdated";
+        emit statusUpdated(s);
+    } else {
+        qWarning() << "[Status Polling]" << r.errorMessage();
+    }
+}
+
+void NodeOwnerApi::handleConnectedPeersResult(const Result<QList<PeerInfoDisplay> > &r)
+{
+    QList<PeerInfoDisplay> peers;
+    if (r.unwrapOrLog(peers)) {
+        emit connectedPeersUpdated(peers);
+    } else {
+        qWarning() << "[Peers Polling]" << r.errorMessage();
+    }
 }
