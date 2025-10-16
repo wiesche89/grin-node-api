@@ -6,7 +6,6 @@
 #include <QVariant>
 #include <QMetaType>
 
-#include "peeraddr.h"
 #include "capabilities.h"
 
 class PeerData
@@ -36,7 +35,7 @@ public:
     Q_ENUM(ReasonForBan)
 
     // Properties exposed to Qt's meta-object system
-    Q_PROPERTY(PeerAddr addr READ getAddr WRITE setAddr)
+    Q_PROPERTY(QString addr READ getAddr WRITE setAddr)
     Q_PROPERTY(Capabilities capabilities READ getCapabilities WRITE setCapabilities)
     Q_PROPERTY(QString userAgent READ getUserAgent WRITE setUserAgent)
     Q_PROPERTY(State flags READ getFlags WRITE setFlags)
@@ -48,7 +47,7 @@ public:
     PeerData();
 
     // Getters
-    PeerAddr getAddr() const;
+    QString getAddr() const;
     Capabilities getCapabilities() const;
     QString getUserAgent() const;
     State getFlags() const;
@@ -57,7 +56,7 @@ public:
     qint64 getLastConnected() const;
 
     // Setters
-    void setAddr(const PeerAddr &addr);
+    void setAddr(const QString &addr);
     void setCapabilities(const Capabilities &capabilities);
     void setUserAgent(const QString &userAgent);
     void setFlags(State flags);
@@ -70,7 +69,7 @@ public:
     QJsonObject toJson() const;
 
 private:
-    PeerAddr m_addr;
+    QString m_addr;
     Capabilities m_capabilities;
     QString m_userAgent;
     State m_flags;

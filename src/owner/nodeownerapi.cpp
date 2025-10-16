@@ -118,6 +118,7 @@ void NodeOwnerApi::getPeersAsync(const QString &peerAddr)
             return;
         }
         auto res = JsonUtil::extractOkValue(o);
+
         QJsonValue ok;
         if (!res.unwrapOrLog(ok)) {
             emit getPeersFinished(Result<QList<PeerData> >(Error(ErrorType::ApiOther, res.errorMessage())));
@@ -129,7 +130,17 @@ void NodeOwnerApi::getPeersAsync(const QString &peerAddr)
                 peers.append(PeerData::fromJson(v.toObject()));
             }
         }
-        emit getPeersFinished(Result<QList<PeerData> >(peers));
+
+        QJsonArray arr;
+        for (const auto &p : peers) {
+            arr.append(p.toJson());   // ✅ PeerData hat toJson()
+        }
+
+        // Bestehendes Signal bleibt unverändert:
+        emit getPeersFinished(Result<QList<PeerData>>(peers));
+
+        // ✅ NEU: QML-freundliches JSON-Signal zusätzlich
+        emit getPeersFinishedQml(arr);
     });
 }
 

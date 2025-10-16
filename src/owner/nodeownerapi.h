@@ -42,6 +42,7 @@ signals:
     void compactChainFinished(Result<bool> result);
     void getConnectedPeersFinished(Result<QList<PeerInfoDisplay> > result);
     void getPeersFinished(Result<QList<PeerData> > result);
+    void getPeersFinishedQml(const QJsonArray &peers);
     void getStatusFinished(Result<Status> result);
     void unbanPeerFinished(Result<bool> result);
     void validateChainFinished(Result<bool> result);

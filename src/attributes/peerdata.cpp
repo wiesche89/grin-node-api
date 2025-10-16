@@ -116,7 +116,7 @@ PeerData::PeerData() :
  * @brief PeerData::getAddr
  * @return
  */
-PeerAddr PeerData::getAddr() const
+QString PeerData::getAddr() const
 {
     return m_addr;
 }
@@ -179,7 +179,7 @@ qint64 PeerData::getLastConnected() const
  * @brief PeerData::setAddr
  * @param a
  */
-void PeerData::setAddr(const PeerAddr &a)
+void PeerData::setAddr(const QString &a)
 {
     m_addr = a;
 }
@@ -247,8 +247,8 @@ PeerData PeerData::fromJson(const QJsonObject &obj)
 {
     PeerData data;
 
-    if (obj.contains("addr") && obj["addr"].isObject()) {
-        data.m_addr = PeerAddr::fromJson(obj["addr"].toObject());
+    if (obj.contains("addr")) {
+        data.m_addr = obj["addr"].toString();
     }
 
     if (obj.contains("capabilities") && obj["capabilities"].isObject()) {
@@ -285,7 +285,7 @@ PeerData PeerData::fromJson(const QJsonObject &obj)
 QJsonObject PeerData::toJson() const
 {
     QJsonObject obj;
-    obj["addr"] = m_addr.toJson();
+    obj["addr"] = m_addr;
     obj["capabilities"] = m_capabilities.toJson();
     obj["user_agent"] = m_userAgent;
     obj["flags"] = stateToString(m_flags);
