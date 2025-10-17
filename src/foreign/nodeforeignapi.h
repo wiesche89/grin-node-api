@@ -25,6 +25,9 @@
 #include "result.h"
 #include "jsonutil.h"
 
+
+// https://docs.rs/grin_api/latest/grin_api/foreign_rpc/trait.ForeignRpc.html
+// https://docs.grin.mw/grin-rfcs/text/0007-node-api-v2/
 class NodeForeignApi : public QObject
 {
     Q_OBJECT
@@ -52,8 +55,13 @@ public:
 
 signals:
     void getBlockFinished(Result<BlockPrintable> result);
+
     void getBlocksFinished(Result<BlockListing> result);
+    void blocksUpdated(const QVariantList &blocks, quint64 lastRetrievedHeight);
+
     void getHeaderFinished(Result<BlockHeaderPrintable> result);
+    void headerUpdated(const BlockHeaderPrintable &header);
+
     void getKernelFinished(Result<LocatedTxKernel> result);
     void getOutputsFinished(Result<QList<OutputPrintable> > result);
     void getPmmrIndicesFinished(Result<OutputListing> result);

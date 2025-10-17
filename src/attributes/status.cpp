@@ -137,7 +137,6 @@ Status Status::fromJson(const QJsonObject &obj)
 
     status.m_syncStatus = obj.value("sync_status").toString();
 
-    qDebug() << obj.value("sync_info");
     if (obj.contains("sync_info")) {
         status.m_syncInfo = SyncInfo::fromJson(obj.value("sync_info"));
     } else {
@@ -158,7 +157,7 @@ QJsonObject Status::toJson() const
     obj.insert("protocol_version", static_cast<int>(m_protocolVersion));
     obj.insert("user_agent", m_userAgent);
     obj.insert("connections", static_cast<int>(m_connections));
-    obj.insert("tip", m_tip.toJson());
+    obj.insert("tip", Tip::toJson(m_tip));
     obj.insert("sync_status", m_syncStatus);
     obj.insert("sync_info", m_syncInfo.toJson());
     return obj;

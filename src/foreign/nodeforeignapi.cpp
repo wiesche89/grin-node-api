@@ -79,12 +79,15 @@ void NodeForeignApi::getBlocksAsync(int startHeight, int endHeight, int max, boo
 {
     QJsonArray params;
     params << startHeight << endHeight << max << includeProof;
+
     postAsync("get_blocks", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
             emit getBlocksFinished(Result<BlockListing>::error(err));
             return;
         }
-        emit getBlocksFinished(parseBlockListing(obj));
+        const BlockListing &bl = parseBlockListing(obj).value();
+        emit blocksUpdated(bl.blocksVariant(), bl.lastRetrievedHeight());
+        emit getBlocksFinished(bl);
     });
 }
 
@@ -100,7 +103,10 @@ void NodeForeignApi::getHeaderAsync(int height, const QString &hash, const QStri
             emit getHeaderFinished(Result<BlockHeaderPrintable>::error(err));
             return;
         }
-        emit getHeaderFinished(parseBlockHeaderPrintable(obj));
+
+        const BlockHeaderPrintable &b = parseBlockHeaderPrintable(obj).value();
+        emit headerUpdated(b);
+        emit getHeaderFinished(b);
     });
 }
 
@@ -180,7 +186,9 @@ void NodeForeignApi::getTipAsync()
             emit getTipFinished(Result<Tip>::error(err));
             return;
         }
+
         auto r = parseTipResult(obj);
+
         emit getTipFinished(r);
         if (!r.hasError()) {
             emit tipUpdated(r.value());
@@ -308,7 +316,8 @@ Result<Tip> NodeForeignApi::parseTipResult(const QJsonObject &rpcObj)
         return Result<Tip>::error(r.errorMessage());
     }
     Tip t;
-    t.fromJson(obj);
+    t = Tip::fromJson(obj);
+
     return Result<Tip>(t);
 }
 
@@ -333,6 +342,7 @@ Result<BlockListing> NodeForeignApi::parseBlockListing(const QJsonObject &rpcObj
     }
     BlockListing bl;
     bl.fromJson(obj);
+
     return Result<BlockListing>(bl);
 }
 
@@ -345,6 +355,11 @@ Result<BlockHeaderPrintable> NodeForeignApi::parseBlockHeaderPrintable(const QJs
     }
     BlockHeaderPrintable h;
     h.fromJson(obj);
+
+    qDebug()<<Q_FUNC_INFO;
+    qDebug()<<h.cuckooSolution();
+    qDebug()<<h.toJson();
+
     return Result<BlockHeaderPrintable>(h);
 }
 

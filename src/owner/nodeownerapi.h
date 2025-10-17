@@ -16,6 +16,7 @@
 #include "result.h"
 #include "jsonutil.h"
 
+// https://docs.rs/grin_api/latest/grin_api/owner_rpc/trait.OwnerRpc.html
 class NodeOwnerApi : public QObject
 {
     Q_OBJECT

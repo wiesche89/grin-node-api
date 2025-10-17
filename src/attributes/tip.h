@@ -32,7 +32,7 @@ public:
 
     // JSON serialization / deserialization
     static Tip fromJson(const QJsonObject &json);
-    QJsonObject toJson() const;
+    static QJsonObject toJson(Tip tip) ;
 
 private:
     quint64 m_height;

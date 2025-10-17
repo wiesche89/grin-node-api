@@ -264,7 +264,6 @@ void NodeOwnerApi::handleStatusResult(const Result<Status> &r)
 {
     Status s;
     if (r.unwrapOrLog(s)) {
-        qDebug() << "emit: statusUpdated";
         emit statusUpdated(s);
     } else {
         qWarning() << "[Status Polling]" << r.errorMessage();

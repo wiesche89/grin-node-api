@@ -104,6 +104,7 @@ void Tip::setTotalDifficulty(quint64 totalDifficulty)
 Tip Tip::fromJson(const QJsonObject &json)
 {
     Tip tip;
+
     if (json.contains("height") && json["height"].isDouble()) {
         tip.setHeight(static_cast<quint64>(json["height"].toDouble()));
     }
@@ -116,6 +117,7 @@ Tip Tip::fromJson(const QJsonObject &json)
     if (json.contains("total_difficulty") && json["total_difficulty"].isDouble()) {
         tip.setTotalDifficulty(static_cast<quint64>(json["total_difficulty"].toDouble()));
     }
+
     return tip;
 }
 
@@ -123,12 +125,12 @@ Tip Tip::fromJson(const QJsonObject &json)
  * @brief Tip::toJson
  * @return
  */
-QJsonObject Tip::toJson() const
+QJsonObject Tip::toJson(Tip tip)
 {
     QJsonObject json;
-    json["height"] = static_cast<double>(m_height);
-    json["last_block_pushed"] = m_lastBlockPushed;
-    json["prev_block_to_last"] = m_prevBlockToLast;
-    json["total_difficulty"] = static_cast<double>(m_totalDifficulty);
+    json["height"] = static_cast<double>(tip.height());
+    json["last_block_pushed"] = tip.lastBlockPushed();
+    json["prev_block_to_last"] = tip.prevBlockToLast();
+    json["total_difficulty"] = static_cast<double>(tip.totalDifficulty());
     return json;
 }
