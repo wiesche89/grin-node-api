@@ -61,6 +61,8 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
 // ---------------------------------------------------------
 void NodeForeignApi::getBlockAsync(int height, const QString &hash, const QString &commit)
 {
+    qDebug()<<Q_FUNC_INFO;
+
     QJsonArray params;
     params << height
            << (hash.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(hash))
@@ -80,19 +82,23 @@ void NodeForeignApi::getBlocksAsync(int startHeight, int endHeight, int max, boo
     QJsonArray params;
     params << startHeight << endHeight << max << includeProof;
 
+    //qDebug()<<Q_FUNC_INFO;
+    //qDebug()<<params;
+
     postAsync("get_blocks", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
             emit getBlocksFinished(Result<BlockListing>::error(err));
             return;
         }
         const BlockListing &bl = parseBlockListing(obj).value();
+
         emit blocksUpdated(bl.blocksVariant(), bl.lastRetrievedHeight());
         emit getBlocksFinished(bl);
     });
 }
 
 void NodeForeignApi::getHeaderAsync(int height, const QString &hash, const QString &commit)
-{
+{   
     QJsonArray params;
     params << height
            << (hash.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(hash))
@@ -105,6 +111,9 @@ void NodeForeignApi::getHeaderAsync(int height, const QString &hash, const QStri
         }
 
         const BlockHeaderPrintable &b = parseBlockHeaderPrintable(obj).value();
+
+        qDebug()<<Q_FUNC_INFO;
+
         emit headerUpdated(b);
         emit getHeaderFinished(b);
     });
@@ -114,11 +123,18 @@ void NodeForeignApi::getKernelAsync(const QString &excess, int minHeight, int ma
 {
     QJsonArray params;
     params << excess << minHeight << maxHeight;
+
     postAsync("get_kernel", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
             emit getKernelFinished(Result<LocatedTxKernel>::error(err));
             return;
         }
+
+        const LocatedTxKernel &b = parseLocatedTxKernel(obj).value();
+
+        qDebug()<<Q_FUNC_INFO;
+
+        emit kernelUpdated(b);
         emit getKernelFinished(parseLocatedTxKernel(obj));
     });
 }
@@ -323,6 +339,7 @@ Result<Tip> NodeForeignApi::parseTipResult(const QJsonObject &rpcObj)
 
 Result<BlockPrintable> NodeForeignApi::parseBlockPrintable(const QJsonObject &rpcObj)
 {
+
     auto r = JsonUtil::extractOkObject(rpcObj);
     QJsonObject obj;
     if (!r.unwrapOrLog(obj)) {
@@ -330,6 +347,9 @@ Result<BlockPrintable> NodeForeignApi::parseBlockPrintable(const QJsonObject &rp
     }
     BlockPrintable b;
     b.fromJson(obj);
+
+    qDebug()<<Q_FUNC_INFO;
+
     return Result<BlockPrintable>(b);
 }
 
@@ -355,10 +375,6 @@ Result<BlockHeaderPrintable> NodeForeignApi::parseBlockHeaderPrintable(const QJs
     }
     BlockHeaderPrintable h;
     h.fromJson(obj);
-
-    qDebug()<<Q_FUNC_INFO;
-    qDebug()<<h.cuckooSolution();
-    qDebug()<<h.toJson();
 
     return Result<BlockHeaderPrintable>(h);
 }

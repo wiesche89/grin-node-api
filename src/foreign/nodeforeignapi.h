@@ -63,6 +63,8 @@ signals:
     void headerUpdated(const BlockHeaderPrintable &header);
 
     void getKernelFinished(Result<LocatedTxKernel> result);
+    void kernelUpdated(const LocatedTxKernel &header);
+
     void getOutputsFinished(Result<QList<OutputPrintable> > result);
     void getPmmrIndicesFinished(Result<OutputListing> result);
     void getPoolSizeFinished(Result<int> result);
