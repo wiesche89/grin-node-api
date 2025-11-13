@@ -13,7 +13,9 @@ void NodeOwnerApi::postAsync(const QString &method, const QJsonArray &params, st
 {
     QNetworkRequest req(m_apiUrl);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    req.setRawHeader("Authorization", m_apiKey.toUtf8());
+    if (!m_apiKey.isEmpty()) {
+        req.setRawHeader("Authorization", m_apiKey.toUtf8());
+    }
 
     QJsonObject payload;
     payload["jsonrpc"] = "2.0";
@@ -137,7 +139,7 @@ void NodeOwnerApi::getPeersAsync(const QString &peerAddr)
         }
 
         // Bestehendes Signal bleibt unverändert:
-        emit getPeersFinished(Result<QList<PeerData>>(peers));
+        emit getPeersFinished(Result<QList<PeerData> >(peers));
 
         // ✅ NEU: QML-freundliches JSON-Signal zusätzlich
         emit getPeersFinishedQml(arr);
