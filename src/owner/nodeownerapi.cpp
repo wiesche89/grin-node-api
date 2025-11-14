@@ -106,6 +106,7 @@ void NodeOwnerApi::getConnectedPeersAsync()
 
 void NodeOwnerApi::getPeersAsync(const QString &peerAddr)
 {
+    qDebug()<<Q_FUNC_INFO;
     QJsonArray params;
     if (!peerAddr.isEmpty()) {
         params.append(peerAddr);
