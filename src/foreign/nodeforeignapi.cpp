@@ -441,8 +441,7 @@ Result<QList<PoolEntry> > NodeForeignApi::parsePoolEntries(const QJsonObject &rp
         if (!e.isObject()) {
             continue;
         }
-        PoolEntry pe;
-        pe.fromJson(e.toObject());
+        PoolEntry pe = PoolEntry::fromJson(e.toObject());
         out.push_back(pe);
     }
     return Result<QList<PoolEntry> >(out);

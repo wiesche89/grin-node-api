@@ -8,7 +8,14 @@
 Transaction Transaction::fromJson(const QJsonObject &obj)
 {
     Transaction tx;
-    if (obj.contains("offset") && obj["offset"].isObject()) {
+    if (obj.contains("tx_id") && obj["tx_id"].isString()) {
+        tx.m_txId = obj["tx_id"].toString();
+    } else if (obj.contains("id") && obj["id"].isString()) {
+        tx.m_txId = obj["id"].toString();
+    }
+    if (obj.contains("offset") && obj["offset"].isString()) {
+        tx.m_offset.setHex(obj["offset"].toString());
+    } else if (obj.contains("offset") && obj["offset"].isObject()) {
         tx.m_offset = BlindingFactor::fromJson(obj["offset"].toObject());
     }
     if (obj.contains("body") && obj["body"].isObject()) {
@@ -24,9 +31,15 @@ Transaction Transaction::fromJson(const QJsonObject &obj)
 QJsonObject Transaction::toJson() const
 {
     QJsonObject obj;
+    obj["tx_id"] = m_txId;
     obj["offset"] = m_offset.toJson();
     obj["body"] = m_body.toJson();
     return obj;
+}
+
+QString Transaction::txId() const
+{
+    return m_txId;
 }
 
 /**
@@ -54,6 +67,11 @@ TransactionBody Transaction::body() const
 void Transaction::setOffset(const BlindingFactor &offset)
 {
     m_offset = offset;
+}
+
+void Transaction::setTxId(const QString &txId)
+{
+    m_txId = txId;
 }
 
 /**

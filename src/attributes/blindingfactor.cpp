@@ -25,6 +25,11 @@ QByteArray BlindingFactor::data() const
     return m_data;
 }
 
+QString BlindingFactor::hex() const
+{
+    return QString::fromUtf8(m_data.toHex());
+}
+
 /**
  * @brief BlindingFactor::setData
  * @param data
@@ -32,6 +37,11 @@ QByteArray BlindingFactor::data() const
 void BlindingFactor::setData(const QByteArray &data)
 {
     m_data = data;
+}
+
+void BlindingFactor::setHex(const QString &hex)
+{
+    m_data = QByteArray::fromHex(hex.toUtf8());
 }
 
 /**

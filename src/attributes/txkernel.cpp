@@ -19,6 +19,11 @@ QString TxKernel::features() const
     return m_features;
 }
 
+qulonglong TxKernel::fee() const
+{
+    return m_fee;
+}
+
 /**
  * @brief TxKernel::excess
  * @return
@@ -44,6 +49,11 @@ QString TxKernel::excessSig() const
 void TxKernel::setFeatures(const QString &features)
 {
     m_features = features;
+}
+
+void TxKernel::setFee(qulonglong fee)
+{
+    m_fee = fee;
 }
 
 /**
@@ -72,6 +82,23 @@ void TxKernel::fromJson(const QJsonObject &json)
 {
     if (json.contains("features") && json["features"].isString()) {
         m_features = json["features"].toString();
+    } else if (json.contains("features") && json["features"].isObject()) {
+        const QJsonObject featuresObj = json["features"].toObject();
+        const QStringList keys = featuresObj.keys();
+        if (!keys.isEmpty()) {
+            m_features = keys.first();
+            const QJsonValue nested = featuresObj.value(m_features);
+            if (nested.isObject()) {
+                const QJsonObject nestedObj = nested.toObject();
+                if (nestedObj.contains("fee") && nestedObj["fee"].isDouble()) {
+                    m_fee = nestedObj["fee"].toVariant().toULongLong();
+                }
+            }
+        }
+    }
+
+    if (json.contains("fee") && json["fee"].isDouble()) {
+        m_fee = json["fee"].toVariant().toULongLong();
     }
 
     if (json.contains("excess") && json["excess"].isString()) {
@@ -91,6 +118,7 @@ QJsonObject TxKernel::toJson() const
 {
     QJsonObject json;
     json["features"] = m_features;
+    json["fee"] = static_cast<qint64>(m_fee);
     json["excess"] = m_excess;
     json["excess_sig"] = m_excessSig;
     return json;

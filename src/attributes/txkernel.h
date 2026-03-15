@@ -10,6 +10,7 @@ class TxKernel
     Q_GADGET
     // Expose properties to Qt's meta-object system
     Q_PROPERTY(QString features READ features WRITE setFeatures)
+    Q_PROPERTY(qulonglong fee READ fee WRITE setFee)
     Q_PROPERTY(QString excess READ excess WRITE setExcess)
     Q_PROPERTY(QString excessSig READ excessSig WRITE setExcessSig)
 
@@ -18,11 +19,13 @@ public:
 
     // Getters
     QString features() const;
+    qulonglong fee() const;
     QString excess() const;
     QString excessSig() const;
 
     // Setters
     void setFeatures(const QString &features);
+    void setFee(qulonglong fee);
     void setExcess(const QString &excess);
     void setExcessSig(const QString &excessSig);
 
@@ -32,6 +35,7 @@ public:
 
 private:
     QString m_features;
+    qulonglong m_fee{0};
     QString m_excess;
     QString m_excessSig;
 };

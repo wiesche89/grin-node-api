@@ -75,7 +75,11 @@ Input Input::fromJson(const QJsonObject &json)
     auto features = static_cast<OutputFeatures::Feature>(json.value("features").toInt());
     Commitment commit;
     if (json.contains("commit")) {
-        commit.fromJson(json.value("commit").toObject());
+        if (json.value("commit").isString()) {
+            commit.setHex(json.value("commit").toString());
+        } else if (json.value("commit").isObject()) {
+            commit.fromJson(json.value("commit").toObject());
+        }
     }
     return Input(features, commit);
 }
