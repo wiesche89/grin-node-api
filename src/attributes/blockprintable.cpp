@@ -24,7 +24,7 @@ BlockHeaderPrintable BlockPrintable::header() const
  * @brief BlockPrintable::inputs
  * @return
  */
-QVector<QString> BlockPrintable::inputs() const
+QVector<Input> BlockPrintable::inputs() const
 {
     return m_inputs;
 }
@@ -60,7 +60,7 @@ void BlockPrintable::setHeader(const BlockHeaderPrintable &header)
  * @brief BlockPrintable::setInputs
  * @param inputs
  */
-void BlockPrintable::setInputs(const QVector<QString> &inputs)
+void BlockPrintable::setInputs(const QVector<Input> &inputs)
 {
     m_inputs = inputs;
 }
@@ -97,7 +97,14 @@ void BlockPrintable::fromJson(const QJsonObject &json)
     if (json.contains("inputs") && json["inputs"].isArray()) {
         QJsonArray arr = json["inputs"].toArray();
         for (const auto &v : arr) {
-            m_inputs.append(v.toString());
+            if (v.isObject()) {
+                m_inputs.append(Input::fromJson(v.toObject()));
+            } else if (v.isString()) {
+                QJsonObject inputObj;
+                inputObj.insert("commit", v.toString());
+                inputObj.insert("features", static_cast<int>(OutputFeatures::Plain));
+                m_inputs.append(Input::fromJson(inputObj));
+            }
         }
     }
 
@@ -137,7 +144,7 @@ QJsonObject BlockPrintable::toJson() const
 
     QJsonArray inputsArray;
     for (const auto &input : m_inputs) {
-        inputsArray.append(input);
+        inputsArray.append(input.toJson());
     }
     json["inputs"] = inputsArray;
 

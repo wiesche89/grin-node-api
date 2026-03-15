@@ -170,7 +170,17 @@ void OutputPrintable::fromJson(const QJsonObject &json)
         m_outputType = OutputType::OutputTypeUnknown;
     }
 
-    m_commit.fromJson(json.value("commit").toObject());
+    if (json.contains("commit")) {
+        if (json.value("commit").isString()) {
+            m_commit.setHex(json.value("commit").toString());
+        } else if (json.value("commit").isObject()) {
+            m_commit.fromJson(json.value("commit").toObject());
+        } else {
+            m_commit = Commitment();
+        }
+    } else {
+        m_commit = Commitment();
+    }
     m_spent = json.value("spent").toBool();
 
     if (json.contains("proof") && !json.value("proof").isNull()) {

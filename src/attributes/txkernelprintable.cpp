@@ -126,8 +126,8 @@ void TxKernelPrintable::fromJson(const QJsonObject &json)
 {
     m_features = json.value("features").toString();
     m_feeShift = static_cast<uint8_t>(json.value("fee_shift").toInt());
-    m_fee = json.value("fee").toString().toULongLong();
-    m_lockHeight = json.value("lock_height").toString().toULongLong();
+    m_fee = json.value("fee").toVariant().toULongLong();
+    m_lockHeight = json.value("lock_height").toVariant().toULongLong();
     m_excess = json.value("excess").toString();
     m_excessSig = json.value("excess_sig").toString();
 }

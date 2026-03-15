@@ -70,10 +70,19 @@ void NodeForeignApi::getBlockAsync(int height, const QString &hash, const QStrin
 
     postAsync("get_block", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
+            emit blockLookupFailed(err);
             emit getBlockFinished(Result<BlockPrintable>::error(err));
             return;
         }
-        emit getBlockFinished(parseBlockPrintable(obj));
+        const auto parsed = parseBlockPrintable(obj);
+        if (parsed.hasError()) {
+            emit blockLookupFailed(parsed.errorMessage());
+            emit getBlockFinished(parsed);
+            return;
+        }
+
+        emit blockUpdated(parsed.value().toJson().toVariantMap());
+        emit getBlockFinished(parsed);
     });
 }
 
@@ -90,7 +99,25 @@ void NodeForeignApi::getBlocksAsync(int startHeight, int endHeight, int max, boo
             emit getBlocksFinished(Result<BlockListing>::error(err));
             return;
         }
-        const BlockListing &bl = parseBlockListing(obj).value();
+        const auto parsed = parseBlockListing(obj);
+        if (parsed.hasError()) {
+            qDebug() << "[NodeForeignApi] get_blocks parse error:" << parsed.errorMessage();
+            emit getBlocksFinished(parsed);
+            return;
+        }
+
+        const BlockListing &bl = parsed.value();
+        qDebug() << "[NodeForeignApi] get_blocks parsed blocks:" << bl.blocks().size()
+                 << "lastRetrievedHeight:" << bl.lastRetrievedHeight();
+        if (!bl.blocks().isEmpty()) {
+            const auto first = bl.blocks().first();
+            const auto last = bl.blocks().last();
+            qDebug() << "[NodeForeignApi] first/last heights:"
+                     << first.header().height() << last.header().height()
+                     << "inputs(first):" << first.inputs().size()
+                     << "outputs(first):" << first.outputs().size()
+                     << "kernels(first):" << first.kernels().size();
+        }
 
         emit blocksUpdated(bl.blocksVariant(), bl.lastRetrievedHeight());
         emit getBlocksFinished(bl);

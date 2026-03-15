@@ -55,6 +55,8 @@ public:
 
 signals:
     void getBlockFinished(Result<BlockPrintable> result);
+    void blockUpdated(const QVariantMap &block);
+    void blockLookupFailed(const QString &message);
 
     void getBlocksFinished(Result<BlockListing> result);
     void blocksUpdated(const QVariantList &blocks, quint64 lastRetrievedHeight);

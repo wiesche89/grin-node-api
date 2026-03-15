@@ -7,6 +7,7 @@
 #include <QJsonArray>
 
 #include "blockheaderprintable.h"
+#include "input.h"
 #include "outputprintable.h"
 #include "txkernelprintable.h"
 
@@ -15,7 +16,7 @@ class BlockPrintable
     Q_GADGET
     // Expose properties to the Qt meta-object system
     Q_PROPERTY(BlockHeaderPrintable header READ header WRITE setHeader)
-    Q_PROPERTY(QVector<QString> inputs READ inputs WRITE setInputs)
+    Q_PROPERTY(QVector<Input> inputs READ inputs WRITE setInputs)
     Q_PROPERTY(QVector<OutputPrintable> outputs READ outputs WRITE setOutputs)
     Q_PROPERTY(QVector<TxKernelPrintable> kernels READ kernels WRITE setKernels)
 
@@ -24,13 +25,13 @@ public:
 
     // Getter
     BlockHeaderPrintable header() const;
-    QVector<QString> inputs() const;
+    QVector<Input> inputs() const;
     QVector<OutputPrintable> outputs() const;
     QVector<TxKernelPrintable> kernels() const;
 
     // Setter
     void setHeader(const BlockHeaderPrintable &header);
-    void setInputs(const QVector<QString> &inputs);
+    void setInputs(const QVector<Input> &inputs);
     void setOutputs(const QVector<OutputPrintable> &outputs);
     void setKernels(const QVector<TxKernelPrintable> &kernels);
 
@@ -40,7 +41,7 @@ public:
 
 private:
     BlockHeaderPrintable m_header;
-    QVector<QString> m_inputs;
+    QVector<Input> m_inputs;
     QVector<OutputPrintable> m_outputs;
     QVector<TxKernelPrintable> m_kernels;
 };
