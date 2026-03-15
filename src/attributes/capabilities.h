@@ -1,6 +1,7 @@
 #ifndef CAPABILITIES_H
 #define CAPABILITIES_H
 
+#include <QStringList>
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QMetaType>
@@ -18,12 +19,10 @@ public:
     QJsonObject toJson() const;
     static Capabilities fromJson(const QJsonObject &obj);
 
-    QString toString() const
-    {
-        return QString("bits: %1").arg(m_obj.value("bits").toInt());
-    }
+    QString toString() const;
 
 private:
+    quint32 bits() const;
     QJsonObject m_obj;
 };
 Q_DECLARE_METATYPE(Capabilities)
