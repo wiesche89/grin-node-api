@@ -73,7 +73,7 @@ signals:
     void getStempoolSizeFinished(Result<int> result);
     void getTipFinished(Result<Tip> result);
     void getUnconfirmedTransactionsFinished(Result<QList<PoolEntry> > result);
-    void getUnspentOutputsFinished(Result<BlockListing> result);
+    void getUnspentOutputsFinished(Result<OutputListing> result);
     void getVersionFinished(Result<NodeVersion> result);
     void pushTransactionFinished(Result<bool> result);
 
@@ -82,6 +82,10 @@ signals:
     void poolSizeUpdated(int size);
     void stempoolSizeUpdated(int size);
     void unconfirmedTransactionsUpdated(const QList<PoolEntry> &entries);
+    void unspentOutputsUpdated(const QVariantList &outputs, quint64 highestIndex, quint64 lastRetrievedIndex);
+    void unspentOutputsLookupFailed(const QString &message);
+    void pmmrIndicesUpdated(const QVariantList &outputs, quint64 highestIndex, quint64 lastRetrievedIndex);
+    void pmmrIndicesLookupFailed(const QString &message);
 
 private slots:
     void onMempoolPollTick();

@@ -89,8 +89,6 @@ void NodeForeignApi::getBlocksAsync(int startHeight, int endHeight, int max, boo
     QJsonArray params;
     params << startHeight << endHeight << max << includeProof;
 
-    //qDebug()<<Q_FUNC_INFO;
-    //qDebug()<<params;
 
     postAsync("get_blocks", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
@@ -125,8 +123,6 @@ void NodeForeignApi::getHeaderAsync(int height, const QString &hash, const QStri
 
         const BlockHeaderPrintable &b = parseBlockHeaderPrintable(obj).value();
 
-        qDebug()<<Q_FUNC_INFO;
-
         emit headerUpdated(b);
         emit getHeaderFinished(b);
     });
@@ -144,8 +140,6 @@ void NodeForeignApi::getKernelAsync(const QString &excess, int minHeight, int ma
         }
 
         const LocatedTxKernel &b = parseLocatedTxKernel(obj).value();
-
-        qDebug()<<Q_FUNC_INFO;
 
         emit kernelUpdated(b);
         emit getKernelFinished(parseLocatedTxKernel(obj));
@@ -169,12 +163,39 @@ void NodeForeignApi::getPmmrIndicesAsync(int startHeight, int endHeight)
 {
     QJsonArray params;
     params << startHeight << endHeight;
+    qDebug() << "[NodeForeignApi] get_pmmr_indices request"
+             << "startHeight=" << startHeight
+             << "endHeight=" << endHeight;
     postAsync("get_pmmr_indices", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
+            qDebug() << "[NodeForeignApi] get_pmmr_indices error:" << err;
             emit getPmmrIndicesFinished(Result<OutputListing>::error(err));
+            emit pmmrIndicesLookupFailed(err);
             return;
         }
-        emit getPmmrIndicesFinished(parseOutputListing(obj));
+        qDebug() << "[NodeForeignApi] get_pmmr_indices raw response:" << obj;
+        auto r = parseOutputListing(obj);
+        emit getPmmrIndicesFinished(r);
+        if (r.hasError()) {
+            qDebug() << "[NodeForeignApi] get_pmmr_indices parse error:" << r.errorMessage();
+            emit pmmrIndicesLookupFailed(r.errorMessage());
+            return;
+        }
+
+        qDebug() << "[NodeForeignApi] get_pmmr_indices parsed"
+                 << "highestIndex=" << r.value().highestIndex()
+                 << "lastRetrievedIndex=" << r.value().lastRetrievedIndex()
+                 << "outputs=" << r.value().outputs().size();
+
+        QVariantList outputsVariant;
+        const auto outputs = r.value().outputs();
+        outputsVariant.reserve(outputs.size());
+        for (const auto &output : outputs) {
+            outputsVariant.append(output.toJson().toVariantMap());
+        }
+        emit pmmrIndicesUpdated(outputsVariant,
+                               r.value().highestIndex(),
+                               r.value().lastRetrievedIndex());
     });
 }
 
@@ -243,13 +264,55 @@ void NodeForeignApi::getUnconfirmedTransactionsAsync()
 void NodeForeignApi::getUnspentOutputsAsync(int startHeight, int endHeight, int max, bool includeProof)
 {
     QJsonArray params;
-    params << startHeight << endHeight << max << includeProof;
+    params << startHeight
+           << (endHeight < 0 ? QJsonValue(QJsonValue::Null) : QJsonValue(endHeight))
+           << max
+           << includeProof;
     postAsync("get_unspent_outputs", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
-            emit getUnspentOutputsFinished(Result<BlockListing>::error(err));
+            emit getUnspentOutputsFinished(Result<OutputListing>::error(err));
+            emit unspentOutputsLookupFailed(err);
             return;
         }
-        emit getUnspentOutputsFinished(parseBlockListing(obj));
+
+        QJsonObject payload;
+        if (obj.contains("result") && obj.value("result").isObject()) {
+            const QJsonObject resultObj = obj.value("result").toObject();
+            if (resultObj.contains("Ok") && resultObj.value("Ok").isObject()) {
+                payload = resultObj.value("Ok").toObject();
+            } else {
+                payload = resultObj;
+            }
+        }
+
+        OutputListing listing;
+        if (!payload.isEmpty()) {
+            listing = OutputListing::fromJson(payload);
+        }
+
+        if (payload.isEmpty()) {
+            auto r = parseOutputListing(obj);
+            emit getUnspentOutputsFinished(r);
+            if (r.hasError()) {
+                qWarning() << "[NodeForeignApi] get_unspent_outputs parse failed:" << r.errorMessage()
+                           << "raw:" << obj;
+                emit unspentOutputsLookupFailed(r.errorMessage());
+                return;
+            }
+            listing = r.value();
+        }
+
+        emit getUnspentOutputsFinished(Result<OutputListing>(listing));
+
+        QVariantList outputsVariant;
+        const auto outputs = listing.outputs();
+        outputsVariant.reserve(outputs.size());
+        for (const auto &output : outputs) {
+            outputsVariant.append(output.toJson().toVariantMap());
+        }
+        emit unspentOutputsUpdated(outputsVariant,
+                                   listing.highestIndex(),
+                                   listing.lastRetrievedIndex());
     });
 }
 
@@ -361,8 +424,6 @@ Result<BlockPrintable> NodeForeignApi::parseBlockPrintable(const QJsonObject &rp
     BlockPrintable b;
     b.fromJson(obj);
 
-    qDebug()<<Q_FUNC_INFO;
-
     return Result<BlockPrintable>(b);
 }
 
@@ -433,8 +494,7 @@ Result<OutputListing> NodeForeignApi::parseOutputListing(const QJsonObject &rpcO
     if (!r.unwrapOrLog(obj)) {
         return Result<OutputListing>::error(r.errorMessage());
     }
-    OutputListing l;
-    l.fromJson(obj);
+    OutputListing l = OutputListing::fromJson(obj);
     return Result<OutputListing>(l);
 }
 

@@ -108,7 +108,6 @@ void NodeOwnerApi::getConnectedPeersAsync()
 
 void NodeOwnerApi::getPeersAsync(const QString &peerAddr)
 {
-    qDebug()<<Q_FUNC_INFO;
     QJsonArray params;
     if (!peerAddr.isEmpty()) {
         params.append(peerAddr);
@@ -217,7 +216,6 @@ void NodeOwnerApi::startStatusPolling(int intervalMs)
     m_statusPollTimer->start();
 
     getStatusAsync(); // initial
-    qInfo() << "[NodeOwnerApi] Status polling started with interval" << intervalMs << "ms";
 }
 
 void NodeOwnerApi::stopStatusPolling()
@@ -226,7 +224,6 @@ void NodeOwnerApi::stopStatusPolling()
         m_statusPollTimer->stop();
         m_statusPollTimer->deleteLater();
         m_statusPollTimer = nullptr;
-        qInfo() << "[NodeOwnerApi] Status polling stopped";
     }
     // gezielt trennen
     disconnect(this, &NodeOwnerApi::getStatusFinished,
@@ -247,7 +244,6 @@ void NodeOwnerApi::startConnectedPeersPolling(int intervalMs)
     m_peersPollTimer->start();
 
     getConnectedPeersAsync(); // initial
-    qInfo() << "[NodeOwnerApi] Connected-peers polling started with interval" << intervalMs << "ms";
 }
 
 void NodeOwnerApi::stopConnectedPeersPolling()
@@ -256,7 +252,6 @@ void NodeOwnerApi::stopConnectedPeersPolling()
         m_peersPollTimer->stop();
         m_peersPollTimer->deleteLater();
         m_peersPollTimer = nullptr;
-        qInfo() << "[NodeOwnerApi] Connected-peers polling stopped";
     }
     disconnect(this, &NodeOwnerApi::getConnectedPeersFinished,
                this, &NodeOwnerApi::handleConnectedPeersResult);
