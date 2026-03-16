@@ -63,9 +63,13 @@ signals:
 
     void getHeaderFinished(Result<BlockHeaderPrintable> result);
     void headerUpdated(const BlockHeaderPrintable &header);
+    void headerUpdatedQml(const QVariantMap &header);
+    void headerLookupFailed(const QString &message);
 
     void getKernelFinished(Result<LocatedTxKernel> result);
     void kernelUpdated(const LocatedTxKernel &header);
+    void kernelUpdatedQml(const QVariantMap &kernel);
+    void kernelLookupFailed(const QString &message);
 
     void getOutputsFinished(Result<QList<OutputPrintable> > result);
     void getPmmrIndicesFinished(Result<OutputListing> result);

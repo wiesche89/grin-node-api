@@ -117,14 +117,21 @@ void NodeForeignApi::getHeaderAsync(int height, const QString &hash, const QStri
 
     postAsync("get_header", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
+            emit headerLookupFailed(err);
             emit getHeaderFinished(Result<BlockHeaderPrintable>::error(err));
             return;
         }
+        const auto parsed = parseBlockHeaderPrintable(obj);
+        if (parsed.hasError()) {
+            emit headerLookupFailed(parsed.errorMessage());
+            emit getHeaderFinished(parsed);
+            return;
+        }
 
-        const BlockHeaderPrintable &b = parseBlockHeaderPrintable(obj).value();
-
+        const BlockHeaderPrintable &b = parsed.value();
         emit headerUpdated(b);
-        emit getHeaderFinished(b);
+        emit headerUpdatedQml(b.toJson().toVariantMap());
+        emit getHeaderFinished(parsed);
     });
 }
 
@@ -135,14 +142,21 @@ void NodeForeignApi::getKernelAsync(const QString &excess, int minHeight, int ma
 
     postAsync("get_kernel", params, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
+            emit kernelLookupFailed(err);
             emit getKernelFinished(Result<LocatedTxKernel>::error(err));
             return;
         }
+        const auto parsed = parseLocatedTxKernel(obj);
+        if (parsed.hasError()) {
+            emit kernelLookupFailed(parsed.errorMessage());
+            emit getKernelFinished(parsed);
+            return;
+        }
 
-        const LocatedTxKernel &b = parseLocatedTxKernel(obj).value();
-
+        const LocatedTxKernel &b = parsed.value();
         emit kernelUpdated(b);
-        emit getKernelFinished(parseLocatedTxKernel(obj));
+        emit kernelUpdatedQml(b.toJson().toVariantMap());
+        emit getKernelFinished(parsed);
     });
 }
 
