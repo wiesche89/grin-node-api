@@ -61,8 +61,6 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
 // ---------------------------------------------------------
 void NodeForeignApi::getBlockAsync(int height, const QString &hash, const QString &commit)
 {
-    qDebug()<<Q_FUNC_INFO;
-
     QJsonArray params;
     params << height
            << (hash.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(hash))
@@ -101,23 +99,11 @@ void NodeForeignApi::getBlocksAsync(int startHeight, int endHeight, int max, boo
         }
         const auto parsed = parseBlockListing(obj);
         if (parsed.hasError()) {
-            qDebug() << "[NodeForeignApi] get_blocks parse error:" << parsed.errorMessage();
             emit getBlocksFinished(parsed);
             return;
         }
 
         const BlockListing &bl = parsed.value();
-        qDebug() << "[NodeForeignApi] get_blocks parsed blocks:" << bl.blocks().size()
-                 << "lastRetrievedHeight:" << bl.lastRetrievedHeight();
-        if (!bl.blocks().isEmpty()) {
-            const auto first = bl.blocks().first();
-            const auto last = bl.blocks().last();
-            qDebug() << "[NodeForeignApi] first/last heights:"
-                     << first.header().height() << last.header().height()
-                     << "inputs(first):" << first.inputs().size()
-                     << "outputs(first):" << first.outputs().size()
-                     << "kernels(first):" << first.kernels().size();
-        }
 
         emit blocksUpdated(bl.blocksVariant(), bl.lastRetrievedHeight());
         emit getBlocksFinished(bl);
