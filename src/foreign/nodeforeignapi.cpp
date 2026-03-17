@@ -334,10 +334,17 @@ void NodeForeignApi::getVersionAsync()
 {
     postAsync("get_version", QJsonArray{}, [this](const QJsonObject &obj, const QString &err) {
         if (!err.isEmpty()) {
+            qWarning() << "[NodeForeignApi] get_version network/error:" << err;
             emit getVersionFinished(Result<NodeVersion>::error(err));
             return;
         }
-        emit getVersionFinished(parseNodeVersion(obj));
+
+        auto parsed = parseNodeVersion(obj);
+        if (parsed.hasError()) {
+            qWarning() << "[NodeForeignApi] get_version parse error:" << parsed.errorMessage();
+        }
+
+        emit getVersionFinished(parsed);
     });
 }
 
@@ -539,9 +546,10 @@ Result<NodeVersion> NodeForeignApi::parseNodeVersion(const QJsonObject &rpcObj)
     auto r = JsonUtil::extractOkObject(rpcObj);
     QJsonObject obj;
     if (!r.unwrapOrLog(obj)) {
+        qWarning() << "[NodeForeignApi] parseNodeVersion extractOkObject failed for:" << rpcObj;
         return Result<NodeVersion>::error(r.errorMessage());
     }
-    NodeVersion nv;
-    nv.fromJson(obj);
+
+    NodeVersion nv = NodeVersion::fromJson(obj);
     return Result<NodeVersion>(nv);
 }
