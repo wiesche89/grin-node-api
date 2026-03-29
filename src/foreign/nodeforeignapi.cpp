@@ -1,6 +1,74 @@
 #include "nodeforeignapi.h"
 #include <QJsonValue>
 #include <QDebug>
+#include "outputfeatures.h"
+
+namespace {
+
+QString inputFeatureName(OutputFeatures::Feature feature)
+{
+    return feature == OutputFeatures::Coinbase
+        ? QStringLiteral("Coinbase")
+        : QStringLiteral("Plain");
+}
+
+QJsonObject serializeKernelFeatures(const TxKernel &kernel)
+{
+    QJsonObject featureArgs;
+    if (kernel.features().isEmpty() || kernel.features() == QStringLiteral("Plain")) {
+        featureArgs.insert(QStringLiteral("fee"), static_cast<qint64>(kernel.fee()));
+    }
+
+    QJsonObject features;
+    features.insert(kernel.features().isEmpty() ? QStringLiteral("Plain") : kernel.features(), featureArgs);
+    return features;
+}
+
+QJsonObject serializeTransactionForNode(const Transaction &tx)
+{
+    QJsonObject txJson;
+    txJson.insert(QStringLiteral("offset"), tx.offset().hex());
+
+    const TransactionBody body = tx.body();
+
+    QJsonArray inputsJson;
+    const QVector<Input> inputs = body.inputs();
+    for (const Input &input : inputs) {
+        QJsonObject inputJson;
+        inputJson.insert(QStringLiteral("features"), inputFeatureName(input.features()));
+        inputJson.insert(QStringLiteral("commit"), input.commit().hex());
+        inputsJson.append(inputJson);
+    }
+
+    QJsonArray outputsJson;
+    const QVector<Output> outputs = body.outputs();
+    for (const Output &output : outputs) {
+        QJsonObject outputJson;
+        outputJson.insert(QStringLiteral("features"), output.features());
+        outputJson.insert(QStringLiteral("commit"), output.commit());
+        outputJson.insert(QStringLiteral("proof"), output.proof());
+        outputsJson.append(outputJson);
+    }
+
+    QJsonArray kernelsJson;
+    const QVector<TxKernel> kernels = body.kernels();
+    for (const TxKernel &kernel : kernels) {
+        QJsonObject kernelJson;
+        kernelJson.insert(QStringLiteral("features"), serializeKernelFeatures(kernel));
+        kernelJson.insert(QStringLiteral("excess"), kernel.excess());
+        kernelJson.insert(QStringLiteral("excess_sig"), kernel.excessSig());
+        kernelsJson.append(kernelJson);
+    }
+
+    QJsonObject bodyJson;
+    bodyJson.insert(QStringLiteral("inputs"), inputsJson);
+    bodyJson.insert(QStringLiteral("outputs"), outputsJson);
+    bodyJson.insert(QStringLiteral("kernels"), kernelsJson);
+    txJson.insert(QStringLiteral("body"), bodyJson);
+    return txJson;
+}
+
+}
 
 // ---------------------------------------------------------
 // ctor
@@ -350,8 +418,7 @@ void NodeForeignApi::getVersionAsync()
 
 void NodeForeignApi::pushTransactionAsync(const Transaction &tx, bool fluff)
 {
-    // Annahme: Transaction hat toJson()/toObject(); sonst anpassen
-    QJsonObject txObj = tx.toJson(); // ggf. tx.toObject()
+    const QJsonObject txObj = serializeTransactionForNode(tx);
     QJsonArray params;
     params << txObj << fluff;
 
