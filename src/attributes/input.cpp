@@ -59,7 +59,10 @@ void Input::setCommit(Commitment commit)
 QJsonObject Input::toJson() const
 {
     QJsonObject json;
-    json["features"] = static_cast<int>(m_features);
+    // CRITICAL: Features must be string like "Plain" or "Coinbase", not integer
+    // Convert enum to string name to match Grin reference format
+    QString featureName = (m_features == OutputFeatures::Coinbase) ? QStringLiteral("Coinbase") : QStringLiteral("Plain");
+    json["features"] = featureName;
     json["commit"] = m_commit.toJson();
 
     return json;
@@ -72,7 +75,21 @@ QJsonObject Input::toJson() const
  */
 Input Input::fromJson(const QJsonObject &json)
 {
-    auto features = static_cast<OutputFeatures::Feature>(json.value("features").toInt());
+    // Handle features as either string ("Plain", "Coinbase") or integer (0, 1)
+    OutputFeatures::Feature features = OutputFeatures::Plain;
+    if (json.contains("features")) {
+        if (json.value("features").isString()) {
+            const QString featureStr = json.value("features").toString();
+            if (featureStr == "Coinbase") {
+                features = OutputFeatures::Coinbase;
+            } else {
+                features = OutputFeatures::Plain;  // Default to "Plain"
+            }
+        } else if (json.value("features").isDouble()) {
+            features = static_cast<OutputFeatures::Feature>(json.value("features").toInt());
+        }
+    }
+    
     Commitment commit;
     if (json.contains("commit")) {
         if (json.value("commit").isString()) {

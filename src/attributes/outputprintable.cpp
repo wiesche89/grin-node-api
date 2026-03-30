@@ -193,6 +193,9 @@ void OutputPrintable::fromJson(const QJsonObject &json)
 
     if (json.contains("block_height") && !json.value("block_height").isNull()) {
         m_blockHeight = json.value("block_height").toVariant();
+    } else if (json.contains("height") && !json.value("height").isNull()) {
+        // Compatibility fallback for payloads that use "height" instead of "block_height".
+        m_blockHeight = json.value("height").toVariant();
     } else {
         m_blockHeight = QVariant();
     }

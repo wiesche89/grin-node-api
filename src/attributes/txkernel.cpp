@@ -95,6 +95,10 @@ void TxKernel::fromJson(const QJsonObject &json)
                 }
             }
         }
+    } else if (json.contains("features") && json["features"].isDouble()) {
+        // Handle integer features (0 -> "Plain", 1 -> "Coinbase")
+        int featureInt = json["features"].toInt();
+        m_features = (featureInt == 1) ? QStringLiteral("Coinbase") : QStringLiteral("Plain");
     }
 
     if (json.contains("fee") && json["fee"].isDouble()) {
@@ -117,8 +121,16 @@ void TxKernel::fromJson(const QJsonObject &json)
 QJsonObject TxKernel::toJson() const
 {
     QJsonObject json;
-    json["features"] = m_features;
-    json["fee"] = static_cast<qint64>(m_fee);
+    
+    // Grin v5 format: features is a nested object {"Plain": {"fee": ...}} or {"Coinbase": {}}
+    // instead of flat structure with separate fee field
+    QJsonObject feeObj;
+    feeObj["fee"] = static_cast<qint64>(m_fee);
+    
+    QJsonObject featuresObj;
+    featuresObj[m_features] = feeObj;  // {"Plain": {"fee": ...}} or {"Coinbase": {"fee": ...}}
+    
+    json["features"] = featuresObj;
     json["excess"] = m_excess;
     json["excess_sig"] = m_excessSig;
     return json;
