@@ -32,7 +32,7 @@ QJsonObject Transaction::toJson() const
 {
     QJsonObject obj;
     obj["tx_id"] = m_txId;
-    obj["offset"] = m_offset.toJson();
+    obj["offset"] = m_offset.hex();
     obj["body"] = m_body.toJson();
     return obj;
 }

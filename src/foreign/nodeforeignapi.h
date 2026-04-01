@@ -40,6 +40,7 @@ public:
     Q_INVOKABLE void getHeaderAsync(int height, const QString &hash, const QString &commit);
     Q_INVOKABLE void getKernelAsync(const QString &excess, int minHeight, int maxHeight);
     Q_INVOKABLE void getOutputsAsync(const QJsonArray &commits, int startHeight, int endHeight, bool includeProof, bool includeMerkleProof);
+    Q_INVOKABLE void getOutputCommitmentsAsync(const QJsonArray &commits);
     Q_INVOKABLE void getPmmrIndicesAsync(int startHeight, int endHeight);
     Q_INVOKABLE void getPoolSizeAsync();
     Q_INVOKABLE void getStempoolSizeAsync();
@@ -72,6 +73,7 @@ signals:
     void kernelLookupFailed(const QString &message);
 
     void getOutputsFinished(Result<QList<OutputPrintable> > result);
+    void getOutputCommitmentsFinished(Result<QList<OutputPrintable> > result);
     void getPmmrIndicesFinished(Result<OutputListing> result);
     void getPoolSizeFinished(Result<int> result);
     void getStempoolSizeFinished(Result<int> result);

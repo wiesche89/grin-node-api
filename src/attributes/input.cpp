@@ -63,7 +63,7 @@ QJsonObject Input::toJson() const
     // Convert enum to string name to match Grin reference format
     QString featureName = (m_features == OutputFeatures::Coinbase) ? QStringLiteral("Coinbase") : QStringLiteral("Plain");
     json["features"] = featureName;
-    json["commit"] = m_commit.toJson();
+    json["commit"] = m_commit.hex();
 
     return json;
 }
