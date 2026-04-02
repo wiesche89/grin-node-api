@@ -1716,6 +1716,9 @@ Result<bool> NodeForeignApi::parseBoolResult(const QJsonObject &rpcObj)
     if (!r.unwrapOrLog(v)) {
         return Result<bool>::error(r.errorMessage());
     }
+    if (v.isNull() || v.isUndefined()) {
+        return Result<bool>(true); // push_transaction on node 5.4.0 returns Ok: null on success
+    }
     if (v.isBool()) {
         return Result<bool>(v.toBool());
     }
