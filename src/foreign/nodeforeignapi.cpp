@@ -823,7 +823,10 @@ void NodeForeignApi::getKernelAsync(const QString &excess, int minHeight, int ma
         }
         const auto parsed = parseLocatedTxKernel(obj);
         if (parsed.hasError()) {
-            emit kernelLookupFailed(parsed.errorMessage());
+            // A missing kernel is expected while a freshly broadcast transaction is still only in the mempool.
+            if (parsed.errorMessage() != QStringLiteral("NotFound")) {
+                emit kernelLookupFailed(parsed.errorMessage());
+            }
             emit getKernelFinished(parsed);
             return;
         }
