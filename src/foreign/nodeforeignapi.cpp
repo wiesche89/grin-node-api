@@ -1,18 +1,12 @@
 #include "nodeforeignapi.h"
 #include <QJsonValue>
-#include <QDebug>
-#include <QCryptographicHash>
 #include <QSet>
 #include <QUrlQuery>
-#include <array>
 #include <memory>
-#include <mutex>
 #include "outputfeatures.h"
 
 extern "C" {
 #include "secp256k1.h"
-#include "secp256k1_aggsig.h"
-#include "secp256k1_commitment.h"
 }
 
 namespace {
@@ -278,217 +272,6 @@ QJsonObject serializeTransactionForNodeLegacyKernel(const Transaction &tx)
     return txJson;
 }
 
-QString prettyJson(const QJsonObject &object)
-{
-    return QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Indented));
-}
-
-void logRpcJson(const QString &label, const QJsonObject &object)
-{
-    Q_UNUSED(label)
-    Q_UNUSED(object)
-}
-
-constexpr char kSecpOrderHex[] =
-    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
-
-bool parseScalarHex(const QString &hex, std::array<unsigned char, 32> *out)
-{
-    if (!out) {
-        return false;
-    }
-    const QByteArray raw = QByteArray::fromHex(hex.trimmed().toUtf8());
-    if (raw.size() != 32) {
-        return false;
-    }
-    for (int i = 0; i < 32; ++i) {
-        (*out)[i] = static_cast<unsigned char>(raw.at(i));
-    }
-    return true;
-}
-
-bool isZeroScalar(const std::array<unsigned char, 32> &value)
-{
-    for (int i = 0; i < 32; ++i) {
-        if (value[i] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-int compareScalars(const std::array<unsigned char, 32> &left,
-                   const std::array<unsigned char, 32> &right)
-{
-    for (int i = 0; i < 32; ++i) {
-        if (left[i] < right[i]) {
-            return -1;
-        }
-        if (left[i] > right[i]) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-std::array<unsigned char, 32> secpOrderScalar()
-{
-    std::array<unsigned char, 32> order{};
-    const QByteArray raw = QByteArray::fromHex(QByteArray(kSecpOrderHex));
-    if (raw.size() == 32) {
-        for (int i = 0; i < 32; ++i) {
-            order[i] = static_cast<unsigned char>(raw.at(i));
-        }
-    }
-    return order;
-}
-
-std::array<unsigned char, 32> subtractScalars(const std::array<unsigned char, 32> &left,
-                                              const std::array<unsigned char, 32> &right)
-{
-    std::array<unsigned char, 32> result{};
-    int borrow = 0;
-    for (int i = 31; i >= 0; --i) {
-        int value = static_cast<int>(left[i]) - static_cast<int>(right[i]) - borrow;
-        if (value < 0) {
-            value += 256;
-            borrow = 1;
-        } else {
-            borrow = 0;
-        }
-        result[i] = static_cast<unsigned char>(value);
-    }
-    return result;
-}
-
-std::array<unsigned char, 32> addScalarsModN(const std::array<unsigned char, 32> &left,
-                                             const std::array<unsigned char, 32> &right)
-{
-    std::array<unsigned char, 32> sum{};
-    int carry = 0;
-    for (int i = 31; i >= 0; --i) {
-        const int value = static_cast<int>(left[i]) + static_cast<int>(right[i]) + carry;
-        sum[i] = static_cast<unsigned char>(value & 0xff);
-        carry = value >> 8;
-    }
-
-    const std::array<unsigned char, 32> order = secpOrderScalar();
-    if (carry > 0 || compareScalars(sum, order) >= 0) {
-        sum = subtractScalars(sum, order);
-    }
-    return sum;
-}
-
-QString scalarToHex(const std::array<unsigned char, 32> &value)
-{
-    QByteArray raw(32, Qt::Uninitialized);
-    for (int i = 0; i < 32; ++i) {
-        raw[i] = static_cast<char>(value[i]);
-    }
-    return QString::fromUtf8(raw.toHex());
-}
-
-bool isValidSecpScalar(const std::array<unsigned char, 32> &value)
-{
-    const std::array<unsigned char, 32> order = secpOrderScalar();
-    return !isZeroScalar(value) && compareScalars(value, order) < 0;
-}
-
-secp256k1_context *diagSecpContext()
-{
-    static secp256k1_context *context = nullptr;
-    static std::once_flag initFlag;
-    std::call_once(initFlag, []() {
-        context = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY);
-    });
-    return context;
-}
-
-bool secpSecretValid(const std::array<unsigned char, 32> &value)
-{
-    secp256k1_context *context = diagSecpContext();
-    if (!context) {
-        return false;
-    }
-    return secp256k1_ec_seckey_verify(context, value.data()) == 1;
-}
-
-bool secpAddOffsets(const std::array<unsigned char, 32> &headerOffset,
-                    const std::array<unsigned char, 32> &txOffset,
-                    std::array<unsigned char, 32> *combinedOut)
-{
-    if (!combinedOut) {
-        return false;
-    }
-    secp256k1_context *context = diagSecpContext();
-    if (!context) {
-        return false;
-    }
-
-    std::array<unsigned char, 32> combined = headerOffset;
-    const int rc = secp256k1_ec_privkey_tweak_add(context, combined.data(), txOffset.data());
-    if (rc != 1) {
-        return false;
-    }
-
-    *combinedOut = combined;
-    return true;
-}
-
-bool isLowerHex(const QString &value)
-{
-    if (value.isEmpty()) {
-        return false;
-    }
-    for (QChar ch : value) {
-        const ushort c = ch.unicode();
-        const bool isDigit = c >= '0' && c <= '9';
-        const bool isLower = c >= 'a' && c <= 'f';
-        if (!isDigit && !isLower) {
-            return false;
-        }
-    }
-    return true;
-}
-
-void appendU64Be(QByteArray &out, quint64 value)
-{
-    for (int shift = 56; shift >= 0; shift -= 8) {
-        out.append(static_cast<char>((value >> shift) & 0xff));
-    }
-}
-
-void appendU64Le(QByteArray &out, quint64 value)
-{
-    for (int shift = 0; shift <= 56; shift += 8) {
-        out.append(static_cast<char>((value >> shift) & 0xff));
-    }
-}
-
-void logPushPayloadDiagnostics(const QJsonObject &txObj)
-{
-    Q_UNUSED(txObj)
-}
-
-void logOffsetDiagnostics(const QString &txOffsetHex,
-                          const QString &headerOffsetHex,
-                          quint64 headerHeight)
-{
-    Q_UNUSED(txOffsetHex)
-    Q_UNUSED(headerOffsetHex)
-    Q_UNUSED(headerHeight)
-}
-
-void logKernelCommitmentDiagnostics(const Transaction &tx)
-{
-    Q_UNUSED(tx)
-}
-
-void logKernelExcessValidation(const Transaction &tx)
-{
-    Q_UNUSED(tx)
-}
-
 }
 
 // ---------------------------------------------------------
@@ -523,10 +306,8 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
         { "params", params }
     };
     const QByteArray body = QJsonDocument(payload).toJson(QJsonDocument::Compact);
-    logRpcJson(QStringLiteral("request method=%1").arg(method), payload);
-
     QNetworkReply *reply = m_networkManager->post(req, body);
-    connect(reply, &QNetworkReply::finished, this, [reply, handler, method]() {
+    connect(reply, &QNetworkReply::finished, this, [reply, handler]() {
         if (reply->error() != QNetworkReply::NoError) {
             const QString err = reply->errorString();
             reply->deleteLater();
@@ -542,7 +323,6 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
             handler(QJsonObject{}, QStringLiteral("Parse error: %1").arg(pe.errorString()));
             return;
         }
-        logRpcJson(QStringLiteral("response method=%1").arg(method), doc.object());
         handler(doc.object(), QString{});
     });
 }
@@ -866,27 +646,12 @@ void NodeForeignApi::pushTransactionAsync(const Transaction &tx, bool fluff)
     const std::shared_ptr<PushDiagContext> diagCtx = std::make_shared<PushDiagContext>();
     diagCtx->txOffset = txObj.value(QStringLiteral("offset")).toString();
 
-    logPushPayloadDiagnostics(txObj);
-
     const QJsonObject legacyKernelTxObj = serializeTransactionForNodeLegacyKernel(tx);
 
     QJsonArray params;
     params << txObj << fluff;
 
     const QString txOffset = txObj.value(QStringLiteral("offset")).toString();
-
-    const auto logPrePushKernelDiagnostics = [this, &tx]() {
-        Q_UNUSED(tx)
-    };
-
-    logPrePushKernelDiagnostics();
-    logKernelCommitmentDiagnostics(tx);
-    logKernelExcessValidation(tx);
-
-    const auto logKernelSignatureDiag = [this, &tx]() {
-        Q_UNUSED(tx)
-    };
-    logKernelSignatureDiag();
 
     const auto sendPushTransaction = [this, params, diagCtx, txObj, fluff, legacyKernelTxObj]() {
         postAsync("push_transaction", params, [this, params, diagCtx, txObj, fluff, legacyKernelTxObj](const QJsonObject &obj, const QString &err) {
@@ -1066,7 +831,6 @@ void NodeForeignApi::pushTransactionAsync(const Transaction &tx, bool fluff)
                 return;
             }
 
-            logOffsetDiagnostics(txOffset, header.value().totalKernelOffset(), tipHeight);
             sendPushTransaction();
         });
     });

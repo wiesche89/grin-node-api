@@ -2,14 +2,11 @@
 #define NODEFOREIGNAPI_H
 
 #include <QObject>
-#include <QUrl>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
-#include <QEventLoop>
 #include <QTimer>
 #include <functional>
 
