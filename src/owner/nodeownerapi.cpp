@@ -263,8 +263,6 @@ void NodeOwnerApi::handleStatusResult(const Result<Status> &r)
     Status s;
     if (r.unwrapOrLog(s)) {
         emit statusUpdated(s);
-    } else {
-        qWarning() << "[Status Polling]" << r.errorMessage();
     }
 }
 
@@ -273,7 +271,5 @@ void NodeOwnerApi::handleConnectedPeersResult(const Result<QList<PeerInfoDisplay
     QList<PeerInfoDisplay> peers;
     if (r.unwrapOrLog(peers)) {
         emit connectedPeersUpdated(peers);
-    } else {
-        qWarning() << "[Peers Polling]" << r.errorMessage();
     }
 }
