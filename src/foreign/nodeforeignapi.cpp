@@ -429,7 +429,7 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
         const QNetworkReply::NetworkError replyError = reply->error();
         const QString replyErrorMessage = replyError == QNetworkReply::NoError ? QString() : reply->errorString();
         QByteArray responseBody = reply->readAll();
-        reply->deleteLater();
+        delete reply;
 
         if (replyError != QNetworkReply::NoError) {
             responseBody.clear();
@@ -443,7 +443,7 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
             QJsonObject payloadObject;
             {
                 QJsonParseError parseError{};
-                const QJsonDocument document = QJsonDocument::fromJson(responseBody, &parseError);
+                QJsonDocument document = QJsonDocument::fromJson(responseBody, &parseError);
                 responseBody.clear();
                 responseBody.squeeze();
 
@@ -457,6 +457,8 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
                     finishRequest(Result<RescanBatchProgress>::error(okPayload.errorMessage()));
                     return;
                 }
+
+                document = QJsonDocument();
             }
 
             RescanBatchProgress progress;
@@ -493,6 +495,8 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
                     ++progress.outputsProcessed;
                 }
             }
+
+            payloadObject = QJsonObject();
 
             batchResult = processingError.isEmpty()
                 ? Result<RescanBatchProgress>(progress)
