@@ -29,6 +29,23 @@ class NodeForeignApi : public QObject
 {
     Q_OBJECT
 public:
+    struct RescanOutput {
+        QString commitment;
+        QString proof;
+        quint64 blockHeight{0};
+        bool spent{false};
+        bool coinbase{false};
+    };
+
+    struct RescanBatchProgress {
+        quint64 highestIndex{0};
+        quint64 lastRetrievedIndex{0};
+        int outputsProcessed{0};
+    };
+
+    using RescanOutputHandler = std::function<QString(const RescanOutput &)>;
+    using RescanBatchFinishedHandler = std::function<void(const Result<RescanBatchProgress> &)>;
+
     explicit NodeForeignApi(QString apiUrl, QString apiKey);
 
     // ------------------- Async-Methoden (QML-fähig) -------------------
@@ -46,6 +63,11 @@ public:
     Q_INVOKABLE void getUnspentOutputsAsync(int startHeight, int endHeight, int max, bool includeProof);
     Q_INVOKABLE void getVersionAsync();
     Q_INVOKABLE void pushTransactionAsync(const Transaction &tx, bool fluff);
+    void getUnspentOutputsForRescanAsync(int startHeight,
+                                         int endHeight,
+                                         int max,
+                                         const RescanOutputHandler &outputHandler,
+                                         const RescanBatchFinishedHandler &finishedHandler);
 
     // Optionales Gesamt-Polling (z. B. für Pool-Ansicht)
     Q_INVOKABLE void startMempoolPolling(int intervalMs);
@@ -113,6 +135,7 @@ private:
     QString m_apiUrl;
     QString m_apiKey;
     QNetworkAccessManager *m_networkManager{nullptr};
+    bool m_rescanRequestInFlight{false};
 
     QTimer *m_mempoolPollTimer{nullptr};
 };
