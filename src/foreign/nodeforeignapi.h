@@ -66,6 +66,7 @@ public:
     void getUnspentOutputsForRescanAsync(int startHeight,
                                          int endHeight,
                                          int max,
+                                         bool includeProofForRescan,
                                          const RescanOutputHandler &outputHandler,
                                          const RescanBatchFinishedHandler &finishedHandler);
 

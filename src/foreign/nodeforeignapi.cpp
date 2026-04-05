@@ -383,6 +383,7 @@ void NodeForeignApi::getUnspentOutputsAsync(int startHeight, int endHeight, int 
 void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
                                                      int endHeight,
                                                      int max,
+                                                     bool includeProofForRescan,
                                                      const RescanOutputHandler &outputHandler,
                                                      const RescanBatchFinishedHandler &finishedHandler)
 {
@@ -407,7 +408,7 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
     params << startHeight
            << (endHeight < 0 ? QJsonValue(QJsonValue::Null) : QJsonValue(endHeight))
            << max
-           << true;
+            << includeProofForRescan;
 
     const QJsonObject payload{
         { "jsonrpc", "2.0" },
@@ -417,71 +418,80 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
     };
     const QByteArray body = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_networkManager->post(req, body);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, outputHandler, finishedHandler]() {
-        const auto finishRequest = [this, &finishedHandler](const Result<RescanBatchProgress> &result) {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, includeProofForRescan, outputHandler, finishedHandler]() {
+        const auto finishRequest = [this, finishedHandler](const Result<RescanBatchProgress> &result) {
             m_rescanRequestInFlight = false;
-            finishedHandler(result);
+            QTimer::singleShot(0, this, [finishedHandler, result]() {
+                finishedHandler(result);
+            });
         };
 
         const QNetworkReply::NetworkError replyError = reply->error();
         const QString replyErrorMessage = replyError == QNetworkReply::NoError ? QString() : reply->errorString();
-        QByteArray data = reply->readAll();
+        QByteArray responseBody = reply->readAll();
         reply->deleteLater();
 
         if (replyError != QNetworkReply::NoError) {
-            data.clear();
+            responseBody.clear();
+            responseBody.squeeze();
             finishRequest(Result<RescanBatchProgress>::error(replyErrorMessage));
             return;
         }
 
         Result<RescanBatchProgress> batchResult;
         {
-            QJsonParseError parseError{};
-            const QJsonDocument document = QJsonDocument::fromJson(data, &parseError);
-            data.clear();
-            data.squeeze();
-
-            if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-                finishRequest(Result<RescanBatchProgress>::error(QStringLiteral("Parse error: %1").arg(parseError.errorString())));
-                return;
-            }
-
-            const Result<QJsonObject> okPayload = JsonUtil::extractOkObject(document.object());
             QJsonObject payloadObject;
-            if (!okPayload.unwrapOrLog(payloadObject)) {
-                finishRequest(Result<RescanBatchProgress>::error(okPayload.errorMessage()));
-                return;
+            {
+                QJsonParseError parseError{};
+                const QJsonDocument document = QJsonDocument::fromJson(responseBody, &parseError);
+                responseBody.clear();
+                responseBody.squeeze();
+
+                if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                    finishRequest(Result<RescanBatchProgress>::error(QStringLiteral("Parse error: %1").arg(parseError.errorString())));
+                    return;
+                }
+
+                const Result<QJsonObject> okPayload = JsonUtil::extractOkObject(document.object());
+                if (!okPayload.unwrapOrLog(payloadObject)) {
+                    finishRequest(Result<RescanBatchProgress>::error(okPayload.errorMessage()));
+                    return;
+                }
             }
 
             RescanBatchProgress progress;
             progress.highestIndex = jsonValueToULongLong(payloadObject.value(QStringLiteral("highest_index")));
             progress.lastRetrievedIndex = jsonValueToULongLong(payloadObject.value(QStringLiteral("last_retrieved_index")));
 
-            const QJsonArray outputs = payloadObject.value(QStringLiteral("outputs")).toArray();
             QString processingError;
-            for (int index = 0; index < outputs.size(); ++index) {
-                const QJsonValue outputValue = outputs.at(index);
-                if (!outputValue.isObject()) {
-                    continue;
-                }
+            {
+                const QJsonArray outputs = payloadObject.take(QStringLiteral("outputs")).toArray();
+                for (int index = 0; index < outputs.size(); ++index) {
+                    const QJsonValue outputValue = outputs.at(index);
+                    if (!outputValue.isObject()) {
+                        continue;
+                    }
 
-                const QJsonObject outputObject = outputValue.toObject();
-                RescanOutput output;
-                output.commitment = outputObject.value(QStringLiteral("commit")).toString();
-                output.proof = outputObject.value(QStringLiteral("proof")).toString();
-                output.blockHeight = jsonValueToULongLong(outputObject.value(QStringLiteral("block_height")));
-                if (output.blockHeight == 0) {
-                    output.blockHeight = jsonValueToULongLong(outputObject.value(QStringLiteral("height")));
-                }
-                output.spent = outputObject.value(QStringLiteral("spent")).toBool();
-                output.coinbase = isCoinbaseOutputType(outputObject.value(QStringLiteral("output_type")));
+                    const QJsonObject outputObject = outputValue.toObject();
+                    RescanOutput output;
+                    output.commitment = outputObject.value(QStringLiteral("commit")).toString();
+                    if (includeProofForRescan) {
+                        output.proof = outputObject.value(QStringLiteral("proof")).toString();
+                    }
+                    output.blockHeight = jsonValueToULongLong(outputObject.value(QStringLiteral("block_height")));
+                    if (output.blockHeight == 0) {
+                        output.blockHeight = jsonValueToULongLong(outputObject.value(QStringLiteral("height")));
+                    }
+                    output.spent = outputObject.value(QStringLiteral("spent")).toBool();
+                    output.coinbase = isCoinbaseOutputType(outputObject.value(QStringLiteral("output_type")));
 
-                processingError = outputHandler(output);
-                if (!processingError.isEmpty()) {
-                    break;
-                }
+                    processingError = outputHandler(output);
+                    if (!processingError.isEmpty()) {
+                        break;
+                    }
 
-                ++progress.outputsProcessed;
+                    ++progress.outputsProcessed;
+                }
             }
 
             batchResult = processingError.isEmpty()
