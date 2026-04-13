@@ -7,6 +7,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
+#include <QStringList>
 #include <QTimer>
 #include <functional>
 
@@ -119,6 +120,9 @@ private slots:
 private:
     // Gemeinsames Async-POST (JSON-RPC)
     void postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &, const QString &)> handler);
+    void configureReplySecurity(QNetworkReply *reply) const;
+    bool verifyPinnedCertificate(QNetworkReply *reply) const;
+    bool usesBuiltInPinnedEndpoint() const;
 
     // Parser
     static Result<int> parseIntResult(const QJsonObject &rpcObj);
@@ -137,6 +141,7 @@ private:
     QString m_apiKey;
     QNetworkAccessManager *m_networkManager{nullptr};
     bool m_rescanRequestInFlight{false};
+    QStringList m_expectedPublicKeyPins;
 
     QTimer *m_mempoolPollTimer{nullptr};
 };

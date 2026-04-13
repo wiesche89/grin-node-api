@@ -1,14 +1,60 @@
 #include "nodeforeignapi.h"
+#include <QCryptographicHash>
 #include <QJsonValue>
+#include <QLoggingCategory>
 #include <QSet>
+#include <QUrl>
 #include <memory>
 #include "wallet/grinwalletnodepushhelpers.h"
+
+#if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
+#include <QSslCertificate>
+#include <QSslConfiguration>
+#include <QSslError>
+#include <QSslKey>
+#include <QSslSocket>
+#endif
 
 extern "C" {
 #include "secp256k1.h"
 }
 
 namespace {
+
+Q_LOGGING_CATEGORY(nodeForeignApiLog, "grinffindor.node.foreign")
+
+QStringList configuredPinsForHost(const QString &host)
+{
+    const QString normalizedHost = host.trimmed().toLower();
+    if (normalizedHost == QStringLiteral("mainnet.grinffindor.org")) {
+        const QString env = qEnvironmentVariable("GRINFFINDOR_MAINNET_TLS_PIN");
+        return env.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    }
+    if (normalizedHost == QStringLiteral("testnet.grinffindor.org")) {
+        const QString env = qEnvironmentVariable("GRINFFINDOR_TESTNET_TLS_PIN");
+        return env.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    }
+    return QStringList();
+}
+
+bool isPinnedBuiltInHost(const QString &host)
+{
+    const QString normalizedHost = host.trimmed().toLower();
+    return normalizedHost == QStringLiteral("mainnet.grinffindor.org")
+        || normalizedHost == QStringLiteral("testnet.grinffindor.org");
+}
+
+#if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
+QString spkiSha256Base64(const QSslCertificate &certificate)
+{
+    const QSslKey key = certificate.publicKey();
+    const QByteArray keyDer = key.toDer();
+    if (keyDer.isEmpty()) {
+        return QString();
+    }
+    return QString::fromUtf8(QCryptographicHash::hash(keyDer, QCryptographicHash::Sha256).toBase64());
+}
+#endif
 
 quint64 jsonValueToULongLong(const QJsonValue &value)
 {
@@ -42,9 +88,95 @@ NodeForeignApi::NodeForeignApi(QString apiUrl, QString apiKey) :
     m_networkManager(new QNetworkAccessManager(this)),
     m_mempoolPollTimer(new QTimer(this))
 {
+#if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
+    const QUrl parsedUrl = QUrl::fromUserInput(m_apiUrl);
+    m_expectedPublicKeyPins = configuredPinsForHost(parsedUrl.host());
+    for (int i = 0; i < m_expectedPublicKeyPins.size(); ++i) {
+        m_expectedPublicKeyPins[i] = m_expectedPublicKeyPins.at(i).trimmed();
+    }
+    if (isPinnedBuiltInHost(parsedUrl.host()) && m_expectedPublicKeyPins.isEmpty()) {
+        qWarning(nodeForeignApiLog) << "Built-in node pinning is enabled in code path but no SPKI pins are configured for"
+                                    << parsedUrl.host()
+                                    << ". Set GRINFFINDOR_MAINNET_TLS_PIN / GRINFFINDOR_TESTNET_TLS_PIN to activate enforcement.";
+    }
+#else
+    m_expectedPublicKeyPins.clear();
+#endif
+
     m_mempoolPollTimer->setSingleShot(false);
     connect(m_mempoolPollTimer, &QTimer::timeout, this, &NodeForeignApi::onMempoolPollTick);
 }
+
+bool NodeForeignApi::usesBuiltInPinnedEndpoint() const
+{
+#if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
+    const QUrl parsedUrl = QUrl::fromUserInput(m_apiUrl);
+    return parsedUrl.scheme() == QStringLiteral("https") && isPinnedBuiltInHost(parsedUrl.host());
+#else
+    return false;
+#endif
+}
+
+#if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
+bool NodeForeignApi::verifyPinnedCertificate(QNetworkReply *reply) const
+{
+    if (!reply || !usesBuiltInPinnedEndpoint() || m_expectedPublicKeyPins.isEmpty()) {
+        return true;
+    }
+
+    const QSslConfiguration sslConfig = reply->sslConfiguration();
+    const QSslCertificate certificate = sslConfig.peerCertificate();
+    if (certificate.isNull()) {
+        qWarning(nodeForeignApiLog) << "TLS pin verification failed: missing peer certificate for" << reply->url();
+        return false;
+    }
+
+    const QString actualPin = spkiSha256Base64(certificate);
+    if (actualPin.isEmpty() || !m_expectedPublicKeyPins.contains(actualPin)) {
+        qWarning(nodeForeignApiLog) << "TLS pin verification failed for"
+                                    << reply->url()
+                                    << "actual pin"
+                                    << actualPin;
+        return false;
+    }
+
+    return true;
+}
+
+void NodeForeignApi::configureReplySecurity(QNetworkReply *reply) const
+{
+    if (!reply || !usesBuiltInPinnedEndpoint()) {
+        return;
+    }
+
+    connect(reply, &QNetworkReply::encrypted, reply, [this, reply]() {
+        if (!verifyPinnedCertificate(reply)) {
+            reply->abort();
+        }
+    });
+
+    connect(reply,
+            qOverload<const QList<QSslError> &>(&QNetworkReply::sslErrors),
+            reply,
+            [this, reply](const QList<QSslError> &errors) {
+                if (errors.isEmpty() && verifyPinnedCertificate(reply)) {
+                    return;
+                }
+                reply->abort();
+            });
+}
+#else
+void NodeForeignApi::configureReplySecurity(QNetworkReply *reply) const
+{
+    Q_UNUSED(reply)
+}
+
+bool NodeForeignApi::verifyPinnedCertificate(QNetworkReply *reply) const
+{
+    Q_UNUSED(reply)
+    return true;
+}
+#endif
 
 // ---------------------------------------------------------
 // JSON-RPC Async POST
@@ -66,6 +198,7 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
     };
     const QByteArray body = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_networkManager->post(req, body);
+    configureReplySecurity(reply);
     connect(reply, &QNetworkReply::finished, this, [reply, handler]() {
         if (reply->error() != QNetworkReply::NoError) {
             const QString err = reply->errorString();
@@ -418,6 +551,7 @@ void NodeForeignApi::getUnspentOutputsForRescanAsync(int startHeight,
     };
     const QByteArray body = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_networkManager->post(req, body);
+    configureReplySecurity(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, includeProofForRescan, outputHandler, finishedHandler]() {
         const auto finishRequest = [this, finishedHandler](const Result<RescanBatchProgress> &result) {
             m_rescanRequestInFlight = false;
@@ -646,6 +780,7 @@ void NodeForeignApi::pushTransactionAsync(const Transaction &tx, bool fluff)
                         }
 
                         QNetworkReply *restReply = m_networkManager->post(restReq, restBody);
+                        configureReplySecurity(restReply);
                         connect(restReply, &QNetworkReply::finished, this, [this,
                                                                             restReply,
                                                                             restIndex,
