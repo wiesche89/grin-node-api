@@ -31,8 +31,12 @@
 class NodeForeignApi : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString apiUrl READ apiUrl WRITE setApiUrl NOTIFY apiUrlChanged)
 public:
     explicit NodeForeignApi(QString apiUrl, QString apiKey);
+
+    QString apiUrl() const { return m_apiUrl; }
+    void setApiUrl(const QString &apiUrl);
 
     // ------------------- Async-Methoden (QML-fähig) -------------------
     Q_INVOKABLE void getBlockAsync(int height, const QString &hash, const QString &commit);
@@ -90,6 +94,7 @@ signals:
     void unspentOutputsLookupFailed(const QString &message);
     void pmmrIndicesUpdated(const QVariantList &outputs, quint64 highestIndex, quint64 lastRetrievedIndex);
     void pmmrIndicesLookupFailed(const QString &message);
+    void apiUrlChanged();
 
 private slots:
     void onMempoolPollTick();

@@ -15,6 +15,15 @@ NodeForeignApi::NodeForeignApi(QString apiUrl, QString apiKey) :
     connect(m_mempoolPollTimer, &QTimer::timeout, this, &NodeForeignApi::onMempoolPollTick);
 }
 
+void NodeForeignApi::setApiUrl(const QString &apiUrl)
+{
+    if (m_apiUrl == apiUrl) {
+        return;
+    }
+    m_apiUrl = apiUrl;
+    emit apiUrlChanged();
+}
+
 // ---------------------------------------------------------
 // JSON-RPC Async POST
 // ---------------------------------------------------------

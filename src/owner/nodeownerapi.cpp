@@ -8,6 +8,15 @@ NodeOwnerApi::NodeOwnerApi(const QString &apiUrl, const QString &apiKey, QObject
 {
 }
 
+void NodeOwnerApi::setApiUrl(const QString &apiUrl)
+{
+    if (m_apiUrl == apiUrl) {
+        return;
+    }
+    m_apiUrl = apiUrl;
+    emit apiUrlChanged();
+}
+
 void NodeOwnerApi::postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &,
                                                                                                  const QString &)> handler)
 {
@@ -80,6 +89,30 @@ void NodeOwnerApi::compactChainAsync()
             return;
         }
         emit compactChainFinished(Result<bool>(ok.isNull() || ok.isObject()));
+    });
+}
+
+void NodeOwnerApi::getConfigAsync()
+{
+    postAsync("get_config", QJsonArray(), [this](const QJsonObject &o, const QString &err) {
+        if (!err.isEmpty()) {
+            emit getConfigFinished(QJsonObject(), err);
+            return;
+        }
+
+        auto res = JsonUtil::extractOkValue(o);
+        QJsonValue ok;
+        if (!res.unwrapOrLog(ok)) {
+            emit getConfigFinished(QJsonObject(), res.errorMessage());
+            return;
+        }
+
+        if (!ok.isObject()) {
+            emit getConfigFinished(QJsonObject(), QStringLiteral("Expected config object"));
+            return;
+        }
+
+        emit getConfigFinished(ok.toObject(), QString());
     });
 }
 

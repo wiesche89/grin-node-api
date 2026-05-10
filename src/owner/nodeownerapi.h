@@ -20,12 +20,17 @@
 class NodeOwnerApi : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString apiUrl READ apiUrl WRITE setApiUrl NOTIFY apiUrlChanged)
 public:
     explicit NodeOwnerApi(const QString &apiUrl, const QString &apiKey, QObject *parent = nullptr);
+
+    QString apiUrl() const { return m_apiUrl; }
+    void setApiUrl(const QString &apiUrl);
 
     // --- Async-Aufrufe (bereits QML-fähig) ---
     Q_INVOKABLE void banPeerAsync(const QString &peerAddr);
     Q_INVOKABLE void compactChainAsync();
+    Q_INVOKABLE void getConfigAsync();
     Q_INVOKABLE void getConnectedPeersAsync();
     Q_INVOKABLE void getPeersAsync(const QString &peerAddr = QString());
     Q_INVOKABLE void getStatusAsync();
@@ -41,6 +46,7 @@ public:
 signals:
     void banPeerFinished(Result<bool> result);
     void compactChainFinished(Result<bool> result);
+    void getConfigFinished(const QJsonObject &config, const QString &error);
     void getConnectedPeersFinished(Result<QList<PeerInfoDisplay> > result);
     void getPeersFinished(Result<QList<PeerData> > result);
     void getPeersFinishedQml(const QJsonArray &peers);
@@ -50,6 +56,7 @@ signals:
 
     void statusUpdated(const Status &status);
     void connectedPeersUpdated(const QList<PeerInfoDisplay> &peers);
+    void apiUrlChanged();
 
 private slots:
     void handleStatusResult(const Result<Status> &r);

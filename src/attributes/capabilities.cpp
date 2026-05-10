@@ -14,7 +14,8 @@ const CapabilityFlag kCapabilityFlags[] = {
     { 0x08u, "TX_KERNEL_HASH" },
     { 0x10u, "PIBD_HIST" },
     { 0x20u, "BLOCK_HIST" },
-    { 0x40u, "PIBD_HIST_1" }
+    { 0x40u, "PIBD_HIST_1" },
+    { 0x80u, "PIHD_HIST" }
 };
 }
 
