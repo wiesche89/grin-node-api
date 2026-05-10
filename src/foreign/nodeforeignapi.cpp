@@ -2,10 +2,7 @@
 #include <QCryptographicHash>
 #include <QJsonValue>
 #include <QLoggingCategory>
-#include <QSet>
 #include <QUrl>
-#include <memory>
-#include "wallet/grinwalletnodepushhelpers.h"
 
 #if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
 #include <QSslCertificate>
@@ -14,10 +11,6 @@
 #include <QSslKey>
 #include <QSslSocket>
 #endif
-
-extern "C" {
-#include "secp256k1.h"
-}
 
 namespace {
 
@@ -674,208 +667,16 @@ void NodeForeignApi::getVersionAsync()
 
 void NodeForeignApi::pushTransactionAsync(const Transaction &tx, bool fluff)
 {
-    struct PushDiagContext {
-        quint64 preTipHeight = 0;
-        QString preTipHash;
-        QString txOffset;
-    };
-
-    const QJsonObject txObj = GrinWalletNodePushHelpers::serializeTransactionForNode(tx);
-    const std::shared_ptr<PushDiagContext> diagCtx = std::make_shared<PushDiagContext>();
-    diagCtx->txOffset = txObj.value(QStringLiteral("offset")).toString();
-
-    const QJsonObject legacyKernelTxObj =
-        GrinWalletNodePushHelpers::serializeTransactionForNodeLegacyKernel(tx);
-
+    const QJsonObject txObj = tx.toJson();
     QJsonArray params;
     params << txObj << fluff;
 
-    const QString txOffset = txObj.value(QStringLiteral("offset")).toString();
-
-    const auto sendPushTransaction = [this, params, diagCtx, txObj, fluff, legacyKernelTxObj]() {
-        postAsync("push_transaction", params, [this, params, diagCtx, txObj, fluff, legacyKernelTxObj](const QJsonObject &obj, const QString &err) {
-            if (!err.isEmpty()) {
-                emit pushTransactionFinished(Result<bool>::error(err));
-                return;
-            }
-            const Result<bool> parsed = parseBoolResult(obj);
-            if (parsed.hasError()) {
-                const bool shouldRetryAsStem = fluff && parsed.errorMessage().contains(QStringLiteral("keychain"), Qt::CaseInsensitive);
-                const bool shouldTryBinaryPoolPush = parsed.errorMessage().contains(QStringLiteral("keychain"), Qt::CaseInsensitive);
-
-                const auto continueAfterBinaryFallback = [this,
-                                                         params,
-                                                         diagCtx,
-                                                         txObj,
-                                                         fluff,
-                                                         legacyKernelTxObj,
-                                                         parsed,
-                                                         shouldRetryAsStem]() {
-                if (shouldRetryAsStem) {
-                    QJsonArray stemParams = params;
-                    if (stemParams.size() >= 2) {
-                        stemParams[1] = false;
-                    }
-                    postAsync("push_transaction", stemParams, [this, parsed, legacyKernelTxObj](const QJsonObject &retryObj, const QString &retryErr) {
-                        if (!retryErr.isEmpty()) {
-                            emit pushTransactionFinished(parsed);
-                            return;
-                        }
-
-                        const Result<bool> retryParsed = parseBoolResult(retryObj);
-                        if (retryParsed.hasError()) {
-                            const bool shouldTryLegacyKernelPayload = retryParsed.errorMessage().contains(QStringLiteral("keychain"), Qt::CaseInsensitive);
-                            if (!shouldTryLegacyKernelPayload) {
-                                emit pushTransactionFinished(parsed);
-                                return;
-                            }
-
-                            QJsonArray legacyStemParams;
-                            legacyStemParams << legacyKernelTxObj << false;
-                            postAsync("push_transaction", legacyStemParams,
-                                      [this, parsed](const QJsonObject &legacyObj, const QString &legacyErr) {
-                                if (!legacyErr.isEmpty()) {
-                                    emit pushTransactionFinished(parsed);
-                                    return;
-                                }
-
-                                const Result<bool> legacyParsed = parseBoolResult(legacyObj);
-                                if (legacyParsed.hasError()) {
-                                    emit pushTransactionFinished(parsed);
-                                    return;
-                                }
-
-                                emit pushTransactionFinished(legacyParsed);
-                            });
-                            return;
-                        }
-
-                        emit pushTransactionFinished(retryParsed);
-                    });
-                    return;
-                }
-
-                    emit pushTransactionFinished(parsed);
-                };
-
-                if (shouldTryBinaryPoolPush) {
-                    QString serializeError;
-                    const QByteArray txBytes =
-                        GrinWalletNodePushHelpers::serializeTransactionForPoolV1(
-                            Transaction::fromJson(txObj), &serializeError);
-                    if (txBytes.isEmpty()) {
-                        continueAfterBinaryFallback();
-                        return;
-                    }
-
-                    const QList<QUrl> restUrls =
-                        GrinWalletNodePushHelpers::poolPushCandidateUrlsForApiUrl(m_apiUrl, fluff);
-                    const QJsonObject restPayload{
-                        { QStringLiteral("tx_hex"), QString::fromUtf8(txBytes.toHex()) }
-                    };
-                    const QByteArray restBody = QJsonDocument(restPayload).toJson(QJsonDocument::Compact);
-
-                    const std::shared_ptr<int> restIndex = std::make_shared<int>(0);
-                    const std::shared_ptr<std::function<void()>> tryNextRestUrl = std::make_shared<std::function<void()>>();
-                    *tryNextRestUrl = [this,
-                                      restUrls,
-                                      restBody,
-                                      txBytes,
-                                      restIndex,
-                                      tryNextRestUrl,
-                                      continueAfterBinaryFallback]() {
-                        if (*restIndex >= restUrls.size()) {
-                            continueAfterBinaryFallback();
-                            return;
-                        }
-
-                        const QUrl restUrl = restUrls.at(*restIndex);
-
-                        QNetworkRequest restReq{restUrl};
-                        restReq.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
-                        if (!m_apiKey.isEmpty()) {
-                            restReq.setRawHeader("Authorization", m_apiKey.toUtf8());
-                        }
-
-                        QNetworkReply *restReply = m_networkManager->post(restReq, restBody);
-                        configureReplySecurity(restReply);
-                        connect(restReply, &QNetworkReply::finished, this, [this,
-                                                                            restReply,
-                                                                            restIndex,
-                                                                            restUrls,
-                                                                            tryNextRestUrl,
-                                                                            continueAfterBinaryFallback]() {
-                            const QByteArray responseBody = restReply->readAll();
-                            const QNetworkReply::NetworkError networkError = restReply->error();
-                            const QString errorString = restReply->errorString();
-                            const int statusCode = restReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                            const QString attemptedUrl = restReply->url().toString();
-                            restReply->deleteLater();
-
-                            if (networkError == QNetworkReply::NoError && statusCode >= 200 && statusCode < 300) {
-                                emit pushTransactionFinished(Result<bool>(true));
-                                return;
-                            }
-
-                            Q_UNUSED(errorString)
-                            Q_UNUSED(attemptedUrl)
-                            Q_UNUSED(responseBody)
-
-                            (*restIndex)++;
-                            if (*restIndex < restUrls.size()) {
-                                (*tryNextRestUrl)();
-                                return;
-                            }
-                            continueAfterBinaryFallback();
-                        });
-                    };
-
-                    (*tryNextRestUrl)();
-                    return;
-                }
-
-                continueAfterBinaryFallback();
-                return;
-            }
-            emit pushTransactionFinished(parsed);
-        });
-    };
-
-    postAsync("get_tip", QJsonArray{}, [this, txOffset, sendPushTransaction, diagCtx](const QJsonObject &tipObj,
-                                                                                       const QString &tipErr) {
-        if (!tipErr.isEmpty()) {
-            sendPushTransaction();
+    postAsync("push_transaction", params, [this](const QJsonObject &obj, const QString &err) {
+        if (!err.isEmpty()) {
+            emit pushTransactionFinished(Result<bool>::error(err));
             return;
         }
-
-        const Result<Tip> tip = parseTipResult(tipObj);
-        if (tip.hasError()) {
-            sendPushTransaction();
-            return;
-        }
-
-        const quint64 tipHeight = tip.value().height();
-        diagCtx->preTipHeight = tipHeight;
-        diagCtx->preTipHash = tip.value().lastBlockPushed();
-        QJsonArray headerParams;
-        headerParams << static_cast<qint64>(tipHeight)
-                     << QJsonValue(QJsonValue::Null)
-                     << QJsonValue(QJsonValue::Null);
-        postAsync("get_header", headerParams, [this, txOffset, tipHeight, sendPushTransaction](const QJsonObject &headerObj,
-                                                                                                 const QString &headerErr) {
-            if (!headerErr.isEmpty()) {
-                sendPushTransaction();
-                return;
-            }
-
-            const Result<BlockHeaderPrintable> header = parseBlockHeaderPrintable(headerObj);
-            if (header.hasError()) {
-                sendPushTransaction();
-                return;
-            }
-
-            sendPushTransaction();
-        });
+        emit pushTransactionFinished(parseBoolResult(obj));
     });
 }
 
