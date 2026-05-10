@@ -2,14 +2,12 @@
 #define NODEFOREIGNAPI_H
 
 #include <QObject>
-#include <QUrl>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
-#include <QEventLoop>
+#include <QStringList>
 #include <QTimer>
 #include <functional>
 
@@ -33,6 +31,23 @@ class NodeForeignApi : public QObject
     Q_OBJECT
     Q_PROPERTY(QString apiUrl READ apiUrl WRITE setApiUrl NOTIFY apiUrlChanged)
 public:
+    struct RescanOutput {
+        QString commitment;
+        QString proof;
+        quint64 blockHeight{0};
+        bool spent{false};
+        bool coinbase{false};
+    };
+
+    struct RescanBatchProgress {
+        quint64 highestIndex{0};
+        quint64 lastRetrievedIndex{0};
+        int outputsProcessed{0};
+    };
+
+    using RescanOutputHandler = std::function<QString(const RescanOutput &)>;
+    using RescanBatchFinishedHandler = std::function<void(const Result<RescanBatchProgress> &)>;
+
     explicit NodeForeignApi(QString apiUrl, QString apiKey);
 
     QString apiUrl() const { return m_apiUrl; }
@@ -44,6 +59,7 @@ public:
     Q_INVOKABLE void getHeaderAsync(int height, const QString &hash, const QString &commit);
     Q_INVOKABLE void getKernelAsync(const QString &excess, int minHeight, int maxHeight);
     Q_INVOKABLE void getOutputsAsync(const QJsonArray &commits, int startHeight, int endHeight, bool includeProof, bool includeMerkleProof);
+    Q_INVOKABLE void getOutputCommitmentsAsync(const QJsonArray &commits);
     Q_INVOKABLE void getPmmrIndicesAsync(int startHeight, int endHeight);
     Q_INVOKABLE void getPoolSizeAsync();
     Q_INVOKABLE void getStempoolSizeAsync();
@@ -52,6 +68,12 @@ public:
     Q_INVOKABLE void getUnspentOutputsAsync(int startHeight, int endHeight, int max, bool includeProof);
     Q_INVOKABLE void getVersionAsync();
     Q_INVOKABLE void pushTransactionAsync(const Transaction &tx, bool fluff);
+    void getUnspentOutputsForRescanAsync(int startHeight,
+                                         int endHeight,
+                                         int max,
+                                         bool includeProofForRescan,
+                                         const RescanOutputHandler &outputHandler,
+                                         const RescanBatchFinishedHandler &finishedHandler);
 
     // Optionales Gesamt-Polling (z. B. für Pool-Ansicht)
     Q_INVOKABLE void startMempoolPolling(int intervalMs);
@@ -76,6 +98,7 @@ signals:
     void kernelLookupFailed(const QString &message);
 
     void getOutputsFinished(Result<QList<OutputPrintable> > result);
+    void getOutputCommitmentsFinished(Result<QList<OutputPrintable> > result);
     void getPmmrIndicesFinished(Result<OutputListing> result);
     void getPoolSizeFinished(Result<int> result);
     void getStempoolSizeFinished(Result<int> result);
@@ -102,6 +125,9 @@ private slots:
 private:
     // Gemeinsames Async-POST (JSON-RPC)
     void postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &, const QString &)> handler);
+    void configureReplySecurity(QNetworkReply *reply) const;
+    bool verifyPinnedCertificate(QNetworkReply *reply) const;
+    bool usesBuiltInPinnedEndpoint() const;
 
     // Parser
     static Result<int> parseIntResult(const QJsonObject &rpcObj);
@@ -119,6 +145,8 @@ private:
     QString m_apiUrl;
     QString m_apiKey;
     QNetworkAccessManager *m_networkManager{nullptr};
+    bool m_rescanRequestInFlight{false};
+    QStringList m_expectedPublicKeyPins;
 
     QTimer *m_mempoolPollTimer{nullptr};
 };
