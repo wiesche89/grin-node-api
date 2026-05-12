@@ -17,6 +17,15 @@ void NodeOwnerApi::setApiUrl(const QString &apiUrl)
     emit apiUrlChanged();
 }
 
+void NodeOwnerApi::setApiKey(const QString &apiKey)
+{
+    if (m_apiKey == apiKey) {
+        return;
+    }
+    m_apiKey = apiKey;
+    emit apiKeyChanged();
+}
+
 void NodeOwnerApi::postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &,
                                                                                                  const QString &)> handler)
 {

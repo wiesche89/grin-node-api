@@ -30,6 +30,7 @@ class NodeForeignApi : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString apiUrl READ apiUrl WRITE setApiUrl NOTIFY apiUrlChanged)
+    Q_PROPERTY(QString apiKey READ apiKey WRITE setApiKey NOTIFY apiKeyChanged)
 public:
     struct RescanOutput {
         QString commitment;
@@ -52,6 +53,8 @@ public:
 
     QString apiUrl() const { return m_apiUrl; }
     void setApiUrl(const QString &apiUrl);
+    QString apiKey() const { return m_apiKey; }
+    void setApiKey(const QString &apiKey);
 
     // ------------------- Async-Methoden (QML-fähig) -------------------
     Q_INVOKABLE void getBlockAsync(int height, const QString &hash, const QString &commit);
@@ -118,6 +121,7 @@ signals:
     void pmmrIndicesUpdated(const QVariantList &outputs, quint64 highestIndex, quint64 lastRetrievedIndex);
     void pmmrIndicesLookupFailed(const QString &message);
     void apiUrlChanged();
+    void apiKeyChanged();
 
 private slots:
     void onMempoolPollTick();

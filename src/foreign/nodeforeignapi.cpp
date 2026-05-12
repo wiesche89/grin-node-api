@@ -118,6 +118,15 @@ void NodeForeignApi::setApiUrl(const QString &apiUrl)
     emit apiUrlChanged();
 }
 
+void NodeForeignApi::setApiKey(const QString &apiKey)
+{
+    if (m_apiKey == apiKey) {
+        return;
+    }
+    m_apiKey = apiKey;
+    emit apiKeyChanged();
+}
+
 bool NodeForeignApi::usesBuiltInPinnedEndpoint() const
 {
 #if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
