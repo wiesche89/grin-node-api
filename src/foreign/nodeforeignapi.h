@@ -54,6 +54,7 @@ public:
     void setApiUrl(const QString &apiUrl);
 
     // ------------------- Async-Methoden (QML-fähig) -------------------
+    void getBlockForDisplayAsync(int height);
     Q_INVOKABLE void getBlockAsync(int height, const QString &hash, const QString &commit);
     Q_INVOKABLE void getBlocksAsync(int startHeight, int endHeight, int max, bool includeProof);
     Q_INVOKABLE void getHeaderAsync(int height, const QString &hash, const QString &commit);
@@ -80,6 +81,7 @@ public:
     Q_INVOKABLE void stopMempoolPolling();
 
 signals:
+    void blockForDisplayFinished(const QJsonObject &block, const QString &error);
     void getBlockFinished(Result<BlockPrintable> result);
     void blockUpdated(const QVariantMap &block);
     void blockLookupFailed(const QString &message);
@@ -124,7 +126,7 @@ private slots:
 
 private:
     // Gemeinsames Async-POST (JSON-RPC)
-    void postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &, const QString &)> handler);
+    void postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &, const QString &)> handler, bool preserveIntegers = false);
     void configureReplySecurity(QNetworkReply *reply) const;
     bool verifyPinnedCertificate(QNetworkReply *reply) const;
     bool usesBuiltInPinnedEndpoint() const;

@@ -6,6 +6,7 @@ INCLUDEPATH += \
     $$PWD/src/owner
 
 HEADERS += \
+    $$PWD/src/foreign/displayjson.h \
     $$PWD/src/attributes/blindingfactor.h \
     $$PWD/src/attributes/blockheaderprintable.h \
     $$PWD/src/attributes/blocklisting.h \

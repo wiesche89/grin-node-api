@@ -3,6 +3,7 @@
 #include <QJsonValue>
 #include <QLoggingCategory>
 #include <QUrl>
+#include "displayjson.h"
 
 #if QT_CONFIG(ssl) && !defined(Q_OS_WASM)
 #include <QSslCertificate>
@@ -193,7 +194,7 @@ bool NodeForeignApi::verifyPinnedCertificate(QNetworkReply *reply) const
 // JSON-RPC Async POST
 // ---------------------------------------------------------
 void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, std::function<void(const QJsonObject &,
-                                                                                                   const QString &)> handler)
+                                                                                                   const QString &)> handler, bool preserveIntegers)
 {
     QNetworkRequest req{ QUrl(m_apiUrl) };
     req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
@@ -210,7 +211,7 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
     const QByteArray body = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkReply *reply = m_networkManager->post(req, body);
     configureReplySecurity(reply);
-    connect(reply, &QNetworkReply::finished, this, [reply, handler]() {
+    connect(reply, &QNetworkReply::finished, this, [reply, handler, preserveIntegers]() {
         if (reply->error() != QNetworkReply::NoError) {
             const QString err = reply->errorString();
             reply->deleteLater();
@@ -220,8 +221,12 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
         const QByteArray data = reply->readAll();
         reply->deleteLater();
 
+        if (preserveIntegers && data.size() > 8 * 1024 * 1024) {
+            handler({}, QStringLiteral("Block response too large"));
+            return;
+        }
         QJsonParseError pe{};
-        const QJsonDocument doc = QJsonDocument::fromJson(data, &pe);
+        const QJsonDocument doc = QJsonDocument::fromJson(preserveIntegers ? displayJson(data) : data, &pe);
         if (pe.error != QJsonParseError::NoError || !doc.isObject()) {
             handler(QJsonObject{}, QStringLiteral("Parse error: %1").arg(pe.errorString()));
             return;
@@ -233,6 +238,20 @@ void NodeForeignApi::postAsync(const QString &method, const QJsonArray &params, 
 // ---------------------------------------------------------
 // Async-Methoden
 // ---------------------------------------------------------
+void NodeForeignApi::getBlockForDisplayAsync(int height)
+{
+    postAsync("get_block", {height, QJsonValue::Null, QJsonValue::Null},
+              [this](const QJsonObject &reply, const QString &error) {
+        const QJsonValue block = reply.value("result").toObject().value("Ok");
+        if (!error.isEmpty() || reply.value("jsonrpc") != "2.0" || reply.value("id").toInt(-1) != 1
+                || reply.contains("error") || !block.isObject()) {
+            emit blockForDisplayFinished({}, error.isEmpty() ? QStringLiteral("Block unavailable") : error);
+            return;
+        }
+        emit blockForDisplayFinished(block.toObject(), {});
+    }, true);
+}
+
 void NodeForeignApi::getBlockAsync(int height, const QString &hash, const QString &commit)
 {
     QJsonArray params;
